@@ -8,6 +8,8 @@ import type { UserProfile } from "@/lib/auth";
 
 interface ProfilePageProps {
   userProfile: UserProfile;
+  shopName?: string;
+  contactNumber?: string;
 }
 
 function InfoRow({ label, value }: { label: string; value: string }) {
@@ -19,7 +21,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-export default function ProfilePage({ userProfile }: ProfilePageProps) {
+export default function ProfilePage({ userProfile, shopName, contactNumber }: ProfilePageProps) {
   const isStaff = userProfile.role === "staff";
 
   const initials = userProfile.name
@@ -66,7 +68,7 @@ export default function ProfilePage({ userProfile }: ProfilePageProps) {
                     Admin
                   </Badge>
                 )}
-                <span className="text-[11px] text-muted-foreground">LaundryTrack</span>
+                <span className="text-[11px] text-muted-foreground">{shopName || "LaundryTrack"}</span>
               </div>
             </div>
 
@@ -97,7 +99,7 @@ export default function ProfilePage({ userProfile }: ProfilePageProps) {
           <InfoRow label="Full Name"     value={userProfile.name} />
           <InfoRow label="Username"      value={userProfile.username || "\u2014"} />
           <InfoRow label="Email Address" value={userProfile.email} />
-          <InfoRow label="Phone Number"  value={userProfile.phone || "\u2014"} />
+          <InfoRow label="Phone Number"  value={contactNumber || userProfile.phone || "\u2014"} />
         </CardContent>
       </Card>
 
@@ -111,7 +113,7 @@ export default function ProfilePage({ userProfile }: ProfilePageProps) {
         </CardHeader>
         <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
           <InfoRow label="Role"      value={isStaff ? "Staff" : "Admin"} />
-          <InfoRow label="Shop Name" value="LaundryTrack" />
+          <InfoRow label="Shop Name" value={shopName || "LaundryTrack"} />
         </CardContent>
       </Card>
 

@@ -725,7 +725,7 @@ function ServiceTypesSettings() {
 }
 
 // ─── Business Profile ────────────────────────────────────────────────────────
-function BusinessProfileSettings() {
+function BusinessProfileSettings({ onSave }: { onSave?: (profile: BusinessProfile) => void }) {
   const [profile, setProfile] = useState<BusinessProfile>(() => loadBusinessProfile());
   const [saved, setSaved] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -743,6 +743,7 @@ function BusinessProfileSettings() {
 
   const handleSave = () => {
     persistBusinessProfile(profile);
+    onSave?.(profile);
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
   };
@@ -1175,13 +1176,14 @@ interface SettingsPageProps {
   page: Page;
   loyaltyEnabled?: boolean;
   onLoyaltyEnabledChange?: (val: boolean) => void;
+  onBusinessProfileChange?: (profile: BusinessProfile) => void;
 }
 
-export default function SettingsPage({ page, loyaltyEnabled = true, onLoyaltyEnabledChange }: SettingsPageProps) {
+export default function SettingsPage({ page, loyaltyEnabled = true, onLoyaltyEnabledChange, onBusinessProfileChange }: SettingsPageProps) {
   switch (page) {
     case "settings-pricing": return <PricingSettings />;
     case "settings-service-types": return <ServiceTypesSettings />;
-    case "settings-business-profile": return <BusinessProfileSettings />;
+    case "settings-business-profile": return <BusinessProfileSettings onSave={onBusinessProfileChange} />;
     case "settings-loyalty": return (
       <LoyaltyProgramSettings
         loyaltyEnabled={loyaltyEnabled}

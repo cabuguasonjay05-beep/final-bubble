@@ -76,18 +76,16 @@ export default function Home() {
             <div className="flex flex-col gap-3">
               <button
                 onClick={() => setView("admin-login")}
-                className="w-full rounded-xl border-2 border-primary bg-primary/5 hover:bg-primary/10 transition-colors px-5 py-4 text-left group cursor-pointer"
+                className="w-full rounded-xl border-2 border-primary bg-primary/5 hover:bg-primary/10 transition-colors px-5 py-3 text-left group cursor-pointer"
               >
                 <p className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">Admin</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">Full access — settings, reports &amp; staff management</p>
               </button>
 
               <button
                 onClick={() => setView("staff-login")}
-                className="w-full rounded-xl border-2 border-border hover:border-primary/40 bg-muted/30 hover:bg-primary/5 transition-colors px-5 py-4 text-left group cursor-pointer"
+                className="w-full rounded-xl border-2 border-border hover:border-primary/40 bg-muted/30 hover:bg-primary/5 transition-colors px-5 py-3 text-left group cursor-pointer"
               >
                 <p className="text-sm font-semibold text-foreground">Staff</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">Limited access — transactions, claims &amp; loyalty</p>
               </button>
             </div>
           </div>

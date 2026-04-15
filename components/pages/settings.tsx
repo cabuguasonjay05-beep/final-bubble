@@ -276,7 +276,7 @@ function PricingSettings() {
             {addOns.map((a) => (
               <div key={a.id} className="flex items-center gap-2 bg-muted/30 rounded-md px-3 py-2">
                 <span className="flex-1 text-sm text-foreground">{a.name}</span>
-                <span className="text-sm text-muted-foreground">���{a.rate}</span>
+                <span className="text-sm text-muted-foreground">&#x20B1;{a.rate}</span>
                 <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => {
                   const next = addOns.filter((x) => x.id !== a.id);
                   setAddOns(next);
@@ -370,12 +370,12 @@ function PricingSettings() {
         </CardContent>
       </Card>
 
-      {/* bottom spacer so content isn't hidden behind sticky bar */}
-      <div className="h-16" />
+      {/* bottom spacer so content isn't hidden behind fixed bar */}
+      <div className="h-20" />
     </div>
 
-    {/* ── Sticky Save Bar ──────────────────────────────────────────────────── */}
-    <div className="sticky bottom-0 z-10 bg-background border-t border-border px-0 py-3 mt-0 flex items-center justify-between gap-3">
+    {/* ── Fixed Save Bar ───────────────────────────────────────────────────── */}
+    <div className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t border-border px-6 py-3 flex items-center justify-between gap-3">
       {saved ? (
         <div className="flex items-center gap-2 text-green-700 bg-green-50 border border-green-200 rounded-lg px-4 py-2 text-sm animate-in fade-in slide-in-from-bottom-1">
           <CheckCircle2 className="w-4 h-4 shrink-0" />

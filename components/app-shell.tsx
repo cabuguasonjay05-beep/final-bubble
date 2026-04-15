@@ -16,6 +16,7 @@ import ProfilePage from "@/components/pages/profile";
 import ChangePasswordPage from "@/components/pages/change-password";
 import DataImportPage from "@/components/pages/data-import";
 import type { UserProfile } from "@/lib/auth";
+import { toast } from "@/hooks/use-toast";
 
 interface AppShellProps {
   onSignOut: () => void;
@@ -63,20 +64,25 @@ export default function AppShell({ onSignOut, adminProfile, onProfileUpdate }: A
     }
   };
 
-  // Pages staff are not allowed to access
+  // Pages staff are NOT allowed to access at all
   const STAFF_BLOCKED: Page[] = [
     "reports",
-    "settings-pricing",
-    "settings-service-types",
-    "settings-business-profile",
     "settings-backup",
-    "settings-loyalty",
     "settings-data-import",
   ];
 
   const handleNavigate = (page: Page) => {
-    // Silently redirect staff away from blocked pages
-    if (adminProfile.role === "staff" && STAFF_BLOCKED.includes(page)) return;
+    if (adminProfile.role === "staff" && STAFF_BLOCKED.includes(page)) {
+      // Redirect to dashboard and notify
+      setActivePage("dashboard");
+      setMobileMenuOpen(false);
+      toast({
+        title: "Access Denied",
+        description: "You don't have permission to access this page.",
+        variant: "destructive",
+      });
+      return;
+    }
     setActivePage(page);
     setMobileMenuOpen(false);
   };

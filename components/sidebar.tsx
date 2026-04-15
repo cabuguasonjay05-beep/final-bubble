@@ -45,8 +45,12 @@ interface SidebarProps {
   role?: UserRole;
 }
 
-// Pages visible to admin only
-const ADMIN_ONLY_PAGES: Page[] = ["reports"];
+// Top-level nav pages hidden from staff
+const ADMIN_ONLY_NAV_PAGES: Page[] = ["reports"];
+
+// Settings sub-pages hidden from staff
+const ADMIN_ONLY_SETTINGS: Page[] = ["settings-backup", "settings-data-import"];
+
 const allNavItems = [
   { id: "dashboard" as Page, label: "Dashboard", icon: LayoutDashboard },
   { id: "transactions" as Page, label: "Transactions", icon: Receipt },
@@ -74,8 +78,13 @@ export default function Sidebar({ activePage, onNavigate, loyaltyEnabled, role =
 
   // Filter nav items based on role
   const navItems = isStaff
-    ? allNavItems.filter((item) => !ADMIN_ONLY_PAGES.includes(item.id))
+    ? allNavItems.filter((item) => !ADMIN_ONLY_NAV_PAGES.includes(item.id))
     : allNavItems;
+
+  // Filter settings sub-items based on role
+  const visibleSettingsSubItems = isStaff
+    ? settingsSubItems.filter((item) => !ADMIN_ONLY_SETTINGS.includes(item.id))
+    : settingsSubItems;
 
   // On mobile the sidebar is shown as a full slide-in drawer (controlled by app-shell)
   // On md (tablet) it starts icon-only; on lg it defaults to full
@@ -134,8 +143,8 @@ export default function Sidebar({ activePage, onNavigate, loyaltyEnabled, role =
             );
           })}
 
-          {/* Settings with sub-menu — admin only */}
-          {!isStaff && <li>
+          {/* Settings with sub-menu — filtered by role */}
+          <li>
             <button
               onClick={() => {
                 if (!effectiveCollapsed) setSettingsOpen((prev) => !prev);
@@ -163,7 +172,7 @@ export default function Sidebar({ activePage, onNavigate, loyaltyEnabled, role =
             </button>
             {!effectiveCollapsed && settingsOpen && (
               <ul className="mt-1 ml-3 pl-3 border-l border-sidebar-border space-y-1">
-                {settingsSubItems.map((sub) => {
+                {visibleSettingsSubItems.map((sub) => {
                   const Icon = sub.icon;
                   const active = activePage === sub.id;
                   return (
@@ -185,7 +194,7 @@ export default function Sidebar({ activePage, onNavigate, loyaltyEnabled, role =
                 })}
               </ul>
             )}
-          </li>}
+          </li>
         </ul>
       </nav>
 

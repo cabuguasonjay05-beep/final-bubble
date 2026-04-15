@@ -4,10 +4,10 @@ import { Camera } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import type { AdminProfile } from "@/app/page";
+import type { UserProfile } from "@/lib/auth";
 
 interface ProfilePageProps {
-  adminProfile: AdminProfile;
+  userProfile: UserProfile;
 }
 
 function InfoRow({ label, value }: { label: string; value: string }) {
@@ -19,7 +19,9 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-export default function ProfilePage({ adminProfile }: ProfilePageProps) {
+export default function ProfilePage({ userProfile }: ProfilePageProps) {
+  // alias for minimal diff below
+  const adminProfile = userProfile;
   const initials = adminProfile.name
     .split(" ")
     .map((w) => w[0])
@@ -45,7 +47,9 @@ export default function ProfilePage({ adminProfile }: ProfilePageProps) {
               <p className="font-semibold text-foreground text-base">{adminProfile.name}</p>
               <p className="text-sm text-muted-foreground">{adminProfile.email}</p>
               <div className="mt-1.5 flex items-center gap-2">
-                <Badge variant="secondary" className="text-[11px] px-2 py-0.5">Admin</Badge>
+                <Badge variant="secondary" className="text-[11px] px-2 py-0.5">
+                  {adminProfile.role === "staff" ? "Staff" : "Admin"}
+                </Badge>
                 <span className="text-[11px] text-muted-foreground">LaundryTrack</span>
               </div>
             </div>
@@ -84,7 +88,7 @@ export default function ProfilePage({ adminProfile }: ProfilePageProps) {
           </CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
-          <InfoRow label="Role"      value="Admin" />
+          <InfoRow label="Role" value={adminProfile.role === "staff" ? "Staff" : "Admin"} />
           <InfoRow label="Shop Name" value="LaundryTrack" />
         </CardContent>
       </Card>

@@ -20,7 +20,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { type Page } from "@/components/sidebar";
-import type { AdminProfile } from "@/app/page";
+import type { UserProfile } from "@/lib/auth";
 
 const pageTitles: Record<Page, string> = {
   dashboard: "Dashboard",
@@ -31,6 +31,7 @@ const pageTitles: Record<Page, string> = {
   "settings-service-types": "Settings — Service Types",
   "settings-business-profile": "Settings — Business Profile",
   "settings-backup": "Settings — Backup & Restore",
+  "settings-loyalty": "Settings — Loyalty Program",
   loyalty: "Loyalty Members",
   profile: "My Profile",
   "change-password": "Change Password",
@@ -51,7 +52,7 @@ interface TopNavProps {
   activePage: Page;
   onNavigate: (page: Page) => void;
   onSignOut: () => void;
-  adminProfile: AdminProfile;
+  adminProfile: UserProfile;
   onMenuToggle: () => void;
   onTransactionDetail?: (ticketId: string) => void;
 }

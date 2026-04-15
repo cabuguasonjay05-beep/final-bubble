@@ -15,12 +15,12 @@ import LoyaltyPage from "@/components/pages/loyalty";
 import ProfilePage from "@/components/pages/profile";
 import ChangePasswordPage from "@/components/pages/change-password";
 import DataImportPage from "@/components/pages/data-import";
-import type { AdminProfile } from "@/app/page";
+import type { UserProfile } from "@/lib/auth";
 
 interface AppShellProps {
   onSignOut: () => void;
-  adminProfile: AdminProfile;
-  onProfileUpdate: (updates: Partial<AdminProfile>) => void;
+  adminProfile: UserProfile;
+  onProfileUpdate: (updates: Partial<UserProfile>) => void;
 }
 
 export default function AppShell({ onSignOut, adminProfile, onProfileUpdate }: AppShellProps) {
@@ -43,7 +43,7 @@ export default function AppShell({ onSignOut, adminProfile, onProfileUpdate }: A
 
   const renderPage = () => {
     switch (activePage) {
-      case "dashboard": return <DashboardPage transactions={txns} loyaltyEnabled={loyaltyEnabled} />;
+      case "dashboard": return <DashboardPage transactions={txns} loyaltyEnabled={loyaltyEnabled} role={adminProfile.role} />;
       case "transactions": return <TransactionsPage transactions={txns} loyaltyEnabled={loyaltyEnabled} />;
       case "claim-verification": return <ClaimVerificationPage transactions={txns} onUpdateTransaction={handleUpdateTransaction} />;
       case "reports": return <ReportsPage />;
@@ -57,13 +57,26 @@ export default function AppShell({ onSignOut, adminProfile, onProfileUpdate }: A
       case "settings-data-import":
         return <DataImportPage onViewTransactions={() => handleNavigate("transactions")} />;
       case "loyalty": return <LoyaltyPage loyaltyEnabled={loyaltyEnabled} />;
-      case "profile": return <ProfilePage adminProfile={adminProfile} />;
+      case "profile": return <ProfilePage userProfile={adminProfile} />;
       case "change-password": return <ChangePasswordPage adminProfile={adminProfile} onProfileUpdate={onProfileUpdate} />;
       default: return <DashboardPage transactions={txns} loyaltyEnabled={loyaltyEnabled} />;
     }
   };
 
+  // Pages staff are not allowed to access
+  const STAFF_BLOCKED: Page[] = [
+    "reports",
+    "settings-pricing",
+    "settings-service-types",
+    "settings-business-profile",
+    "settings-backup",
+    "settings-loyalty",
+    "settings-data-import",
+  ];
+
   const handleNavigate = (page: Page) => {
+    // Silently redirect staff away from blocked pages
+    if (adminProfile.role === "staff" && STAFF_BLOCKED.includes(page)) return;
     setActivePage(page);
     setMobileMenuOpen(false);
   };
@@ -87,7 +100,7 @@ export default function AppShell({ onSignOut, adminProfile, onProfileUpdate }: A
           ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
         `}
       >
-        <Sidebar activePage={activePage} onNavigate={handleNavigate} loyaltyEnabled={loyaltyEnabled} />
+        <Sidebar activePage={activePage} onNavigate={handleNavigate} loyaltyEnabled={loyaltyEnabled} role={adminProfile.role} />
       </div>
 
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">

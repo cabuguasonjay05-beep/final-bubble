@@ -65,7 +65,8 @@ const summaryCards = [
   },
 ];
 
-export default function DashboardPage({ loyaltyEnabled = true }: { transactions?: unknown; loyaltyEnabled?: boolean }) {
+export default function DashboardPage({ loyaltyEnabled = true, role = "admin" }: { transactions?: unknown; loyaltyEnabled?: boolean; role?: "admin" | "staff" }) {
+  const isStaff = role === "staff";
   const [selectedTxn, setSelectedTxn] = useState<Transaction | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
 
@@ -79,7 +80,7 @@ export default function DashboardPage({ loyaltyEnabled = true }: { transactions?
     <div className="space-y-4 md:space-y-6">
       {/* Summary Cards — 1 col mobile, 2 col sm, 4 col lg */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-        {summaryCards.map((card) => {
+        {summaryCards.filter((card) => !(isStaff && card.label === "Total Revenue Today")).map((card) => {
           const Icon = card.icon;
           return (
             <Card key={card.label} className="border border-border shadow-none">

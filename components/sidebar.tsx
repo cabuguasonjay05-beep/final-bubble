@@ -21,6 +21,7 @@ import {
   Upload,
   Gift,
 } from "lucide-react";
+import type { UserRole } from "@/lib/auth";
 
 export type Page =
   | "dashboard"
@@ -41,9 +42,12 @@ interface SidebarProps {
   activePage: Page;
   onNavigate: (page: Page) => void;
   loyaltyEnabled: boolean;
+  role?: UserRole;
 }
 
-const navItems = [
+// Pages visible to admin only
+const ADMIN_ONLY_PAGES: Page[] = ["reports"];
+const allNavItems = [
   { id: "dashboard" as Page, label: "Dashboard", icon: LayoutDashboard },
   { id: "transactions" as Page, label: "Transactions", icon: Receipt },
   { id: "claim-verification" as Page, label: "Claim Verification", icon: QrCode },
@@ -60,12 +64,18 @@ const settingsSubItems = [
   { id: "settings-data-import" as Page, label: "Data Import", icon: Upload },
 ];
 
-export default function Sidebar({ activePage, onNavigate, loyaltyEnabled }: SidebarProps) {
+export default function Sidebar({ activePage, onNavigate, loyaltyEnabled, role = "admin" }: SidebarProps) {
   // On desktop: user can collapse to icon-only. On tablet (md): starts collapsed.
   const [collapsed, setCollapsed] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(activePage.startsWith("settings"));
 
   const isSettingsActive = activePage.startsWith("settings");
+  const isStaff = role === "staff";
+
+  // Filter nav items based on role
+  const navItems = isStaff
+    ? allNavItems.filter((item) => !ADMIN_ONLY_PAGES.includes(item.id))
+    : allNavItems;
 
   // On mobile the sidebar is shown as a full slide-in drawer (controlled by app-shell)
   // On md (tablet) it starts icon-only; on lg it defaults to full
@@ -124,8 +134,8 @@ export default function Sidebar({ activePage, onNavigate, loyaltyEnabled }: Side
             );
           })}
 
-          {/* Settings with sub-menu */}
-          <li>
+          {/* Settings with sub-menu — admin only */}
+          {!isStaff && <li>
             <button
               onClick={() => {
                 if (!effectiveCollapsed) setSettingsOpen((prev) => !prev);
@@ -175,7 +185,7 @@ export default function Sidebar({ activePage, onNavigate, loyaltyEnabled }: Side
                 })}
               </ul>
             )}
-          </li>
+          </li>}
         </ul>
       </nav>
 

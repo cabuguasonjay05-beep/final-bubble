@@ -5,7 +5,7 @@ import Sidebar, { type Page } from "@/components/sidebar";
 import TopNav from "@/components/topnav";
 import { TransactionDetailModal } from "@/components/transaction-detail-modal";
 import { transactions, type Transaction } from "@/lib/data";
-import { loadLoyaltySettings } from "@/lib/settings-store";
+import { loadLoyaltySettings, loadBusinessProfile, type BusinessProfile } from "@/lib/settings-store";
 import DashboardPage from "@/components/pages/dashboard";
 import TransactionsPage from "@/components/pages/transactions";
 import ClaimVerificationPage from "@/components/pages/claim-verification";
@@ -15,12 +15,15 @@ import LoyaltyPage from "@/components/pages/loyalty";
 import ProfilePage from "@/components/pages/profile";
 import ChangePasswordPage from "@/components/pages/change-password";
 import DataImportPage from "@/components/pages/data-import";
-import type { AdminProfile } from "@/app/page";
+import StaffManagementPage from "@/components/pages/staff-management";
+import AuditLogsPage from "@/components/pages/audit-logs";
+import type { UserProfile } from "@/lib/auth";
+import { toast } from "@/hooks/use-toast";
 
 interface AppShellProps {
   onSignOut: () => void;
-  adminProfile: AdminProfile;
-  onProfileUpdate: (updates: Partial<AdminProfile>) => void;
+  adminProfile: UserProfile;
+  onProfileUpdate: (updates: Partial<UserProfile>) => void;
 }
 
 export default function AppShell({ onSignOut, adminProfile, onProfileUpdate }: AppShellProps) {
@@ -30,6 +33,7 @@ export default function AppShell({ onSignOut, adminProfile, onProfileUpdate }: A
   const [detailOpen, setDetailOpen] = useState(false);
   const [txns, setTxns] = useState<Transaction[]>(transactions);
   const [loyaltyEnabled, setLoyaltyEnabled] = useState<boolean>(() => loadLoyaltySettings().enabled);
+  const [businessProfile, setBusinessProfile] = useState<BusinessProfile>(() => loadBusinessProfile());
 
   const handleTransactionDetail = (ticketId: string) => {
     const txn = txns.find((t) => t.ticketId === ticketId) ?? null;
@@ -43,27 +47,50 @@ export default function AppShell({ onSignOut, adminProfile, onProfileUpdate }: A
 
   const renderPage = () => {
     switch (activePage) {
-      case "dashboard": return <DashboardPage transactions={txns} loyaltyEnabled={loyaltyEnabled} />;
+      case "dashboard": return <DashboardPage transactions={txns} loyaltyEnabled={loyaltyEnabled} role={adminProfile.role} onNavigate={handleNavigate} />;
       case "transactions": return <TransactionsPage transactions={txns} loyaltyEnabled={loyaltyEnabled} />;
       case "claim-verification": return <ClaimVerificationPage transactions={txns} onUpdateTransaction={handleUpdateTransaction} />;
       case "reports": return <ReportsPage />;
       case "settings-pricing":
       case "settings-service-types":
-      case "settings-business-profile":
       case "settings-backup":
         return <SettingsPage page={activePage} />;
+      case "settings-business-profile":
+        return <SettingsPage page={activePage} onBusinessProfileChange={setBusinessProfile} />;
       case "settings-loyalty":
         return <SettingsPage page={activePage} loyaltyEnabled={loyaltyEnabled} onLoyaltyEnabledChange={setLoyaltyEnabled} />;
       case "settings-data-import":
         return <DataImportPage onViewTransactions={() => handleNavigate("transactions")} />;
+      case "staff-management": return <StaffManagementPage />;
+      case "audit-logs": return <AuditLogsPage />;
       case "loyalty": return <LoyaltyPage loyaltyEnabled={loyaltyEnabled} />;
-      case "profile": return <ProfilePage adminProfile={adminProfile} />;
+      case "profile": return <ProfilePage userProfile={adminProfile} shopName={businessProfile.shopName} contactNumber={businessProfile.contactNumber} />;
       case "change-password": return <ChangePasswordPage adminProfile={adminProfile} onProfileUpdate={onProfileUpdate} />;
       default: return <DashboardPage transactions={txns} loyaltyEnabled={loyaltyEnabled} />;
     }
   };
 
+  // Pages staff are NOT allowed to access at all
+  const STAFF_BLOCKED: Page[] = [
+    "reports",
+    "settings-backup",
+    "settings-data-import",
+    "staff-management",
+    "audit-logs",
+  ];
+
   const handleNavigate = (page: Page) => {
+    if (adminProfile.role === "staff" && STAFF_BLOCKED.includes(page)) {
+      // Redirect to dashboard and notify
+      setActivePage("dashboard");
+      setMobileMenuOpen(false);
+      toast({
+        title: "Access Denied",
+        description: "You don't have permission to access this page.",
+        variant: "destructive",
+      });
+      return;
+    }
     setActivePage(page);
     setMobileMenuOpen(false);
   };
@@ -87,7 +114,7 @@ export default function AppShell({ onSignOut, adminProfile, onProfileUpdate }: A
           ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
         `}
       >
-        <Sidebar activePage={activePage} onNavigate={handleNavigate} loyaltyEnabled={loyaltyEnabled} />
+        <Sidebar activePage={activePage} onNavigate={handleNavigate} loyaltyEnabled={loyaltyEnabled} role={adminProfile.role} />
       </div>
 
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">

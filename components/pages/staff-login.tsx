@@ -5,34 +5,29 @@ import { Eye, EyeOff, WashingMachine, ChevronDown, ChevronUp } from "lucide-reac
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { authenticateAdmin } from "@/lib/auth";
+import { authenticateStaff } from "@/lib/auth";
 import type { UserProfile } from "@/lib/auth";
 
-// TODO: Replace mock auth with Supabase auth
-
-interface LoginPageProps {
+interface StaffLoginPageProps {
   onLogin: (profile: UserProfile) => void;
-  onForgotPassword: () => void;
-  onCreateAccount: () => void;
-  onBack?: () => void;
+  onSwitchToAdmin: () => void;
 }
 
-export default function LoginPage({ onLogin, onForgotPassword, onCreateAccount, onBack }: LoginPageProps) {
-  const [email, setEmail] = useState("");
+export default function StaffLoginPage({ onLogin, onSwitchToAdmin }: StaffLoginPageProps) {
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showHint, setShowHint] = useState(false);
 
   const handleLogin = () => {
-    if (!email.trim() || !password.trim()) {
+    if (!username.trim() || !password.trim()) {
       setError("Please fill in all fields.");
       return;
     }
-    const profile = authenticateAdmin(email, password);
+    const profile = authenticateStaff(username, password);
     if (!profile) {
-      setError("Invalid email or password.");
+      setError("Invalid username or password.");
       return;
     }
     setError(null);
@@ -45,7 +40,7 @@ export default function LoginPage({ onLogin, onForgotPassword, onCreateAccount, 
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#0c249c] px-4">
-      {/* Subtle pattern overlay */}
+      {/* Subtle dot pattern */}
       <div
         className="absolute inset-0 opacity-[0.06] pointer-events-none"
         style={{
@@ -55,7 +50,6 @@ export default function LoginPage({ onLogin, onForgotPassword, onCreateAccount, 
       />
 
       <div className="relative w-full max-w-sm">
-        {/* Card */}
         <div className="bg-card rounded-2xl shadow-lg border border-border px-8 py-10">
           {/* Logo */}
           <div className="flex flex-col items-center mb-8">
@@ -66,19 +60,7 @@ export default function LoginPage({ onLogin, onForgotPassword, onCreateAccount, 
             <p className="text-xs text-muted-foreground mt-0.5">Sunshine Laundry Shop</p>
           </div>
 
-          <div className="flex items-center justify-center gap-2 mb-6">
-            {onBack && (
-              <button
-                type="button"
-                onClick={onBack}
-                className="text-[11px] text-muted-foreground hover:text-foreground transition-colors absolute left-8 cursor-pointer"
-                aria-label="Back to role selection"
-              >
-                &larr; Back
-              </button>
-            )}
-            <h1 className="text-base font-semibold text-foreground text-center">Admin Login</h1>
-          </div>
+          <h1 className="text-base font-semibold text-foreground text-center mb-6">Staff Login</h1>
 
           {/* Error banner */}
           {error && (
@@ -88,31 +70,31 @@ export default function LoginPage({ onLogin, onForgotPassword, onCreateAccount, 
           )}
 
           <div className="flex flex-col gap-4">
-            {/* Email */}
+            {/* Username */}
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="email" className="text-xs font-medium text-foreground">
-                Email
+              <Label htmlFor="staff-username" className="text-xs font-medium text-foreground">
+                Username
               </Label>
               <Input
-                id="email"
-                type="email"
-                placeholder="admin@laundrytrack.ph"
-                value={email}
-                onChange={(e) => { setEmail(e.target.value); setError(null); }}
+                id="staff-username"
+                type="text"
+                placeholder="staff01"
+                value={username}
+                onChange={(e) => { setUsername(e.target.value); setError(null); }}
                 onKeyDown={handleKeyDown}
-                className={error && !email.trim() ? "border-destructive focus-visible:ring-destructive" : ""}
-                autoComplete="email"
+                className={error && !username.trim() ? "border-destructive focus-visible:ring-destructive" : ""}
+                autoComplete="username"
               />
             </div>
 
             {/* Password */}
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="password" className="text-xs font-medium text-foreground">
+              <Label htmlFor="staff-password" className="text-xs font-medium text-foreground">
                 Password
               </Label>
               <div className="relative">
                 <Input
-                  id="password"
+                  id="staff-password"
                   type={showPassword ? "text" : "password"}
                   placeholder="Enter your password"
                   value={password}
@@ -132,19 +114,13 @@ export default function LoginPage({ onLogin, onForgotPassword, onCreateAccount, 
               </div>
             </div>
 
-            {/* Remember Me */}
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                className="w-4 h-4 rounded border-input accent-primary cursor-pointer"
-              />
-              <span className="text-xs text-muted-foreground">Remember me</span>
-            </label>
+            {/* Staff note */}
+            <p className="text-[11px] text-muted-foreground text-center leading-relaxed">
+              Staff accounts are created by the Admin only. Contact your manager if you need access.
+            </p>
 
             {/* Login button */}
-            <Button className="w-full mt-1 cursor-pointer" onClick={handleLogin}>
+            <Button className="w-full cursor-pointer" onClick={handleLogin}>
               Login
             </Button>
 
@@ -163,36 +139,26 @@ export default function LoginPage({ onLogin, onForgotPassword, onCreateAccount, 
               </button>
               {showHint && (
                 <div className="px-3 pb-3 pt-1 text-[11px] text-blue-800 space-y-1 border-t border-blue-200 bg-blue-50">
-                  <p><span className="font-semibold">Email:</span> admin@laundrytrack.ph</p>
-                  <p><span className="font-semibold">Password:</span> admin123</p>
+                  <p><span className="font-semibold">Username:</span> staff01</p>
+                  <p><span className="font-semibold">Password:</span> staff123</p>
                 </div>
               )}
             </div>
 
-            {/* Forgot password */}
-            <button
-              type="button"
-              onClick={onForgotPassword}
-              className="text-xs text-primary hover:underline text-center cursor-pointer transition-colors"
-            >
-              Forgot Password?
-            </button>
-
-            {/* Divider */}
+            {/* Switch to admin */}
             <div className="flex items-center gap-3 my-1">
               <div className="flex-1 h-px bg-border" />
               <span className="text-xs text-muted-foreground">or</span>
               <div className="flex-1 h-px bg-border" />
             </div>
 
-            {/* Create Account */}
             <Button
               type="button"
               variant="outline"
               className="w-full border-primary text-primary hover:bg-primary/5 cursor-pointer"
-              onClick={onCreateAccount}
+              onClick={onSwitchToAdmin}
             >
-              Create Account
+              Admin Login
             </Button>
           </div>
         </div>

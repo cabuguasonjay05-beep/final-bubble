@@ -20,7 +20,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { type Page } from "@/components/sidebar";
-import type { AdminProfile } from "@/app/page";
+import type { UserProfile } from "@/lib/auth";
 
 const pageTitles: Record<Page, string> = {
   dashboard: "Dashboard",
@@ -31,6 +31,9 @@ const pageTitles: Record<Page, string> = {
   "settings-service-types": "Settings — Service Types",
   "settings-business-profile": "Settings — Business Profile",
   "settings-backup": "Settings — Backup & Restore",
+  "settings-loyalty": "Settings — Loyalty Program",
+  "staff-management": "Staff Management",
+  "audit-logs": "Audit Logs",
   loyalty: "Loyalty Members",
   profile: "My Profile",
   "change-password": "Change Password",
@@ -51,12 +54,13 @@ interface TopNavProps {
   activePage: Page;
   onNavigate: (page: Page) => void;
   onSignOut: () => void;
-  adminProfile: AdminProfile;
+  adminProfile: UserProfile;
   onMenuToggle: () => void;
   onTransactionDetail?: (ticketId: string) => void;
 }
 
 export default function TopNav({ activePage, onNavigate, onSignOut, adminProfile, onMenuToggle, onTransactionDetail }: TopNavProps) {
+  const isStaff = adminProfile.role === "staff";
   const [notifications, setNotifications] = useState<Notification[]>(initialNotifications);
   const [notifOpen, setNotifOpen] = useState(false);
   const [signOutOpen, setSignOutOpen] = useState(false);
@@ -181,9 +185,14 @@ export default function TopNav({ activePage, onNavigate, onSignOut, adminProfile
               <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center shrink-0">
                 <User className="w-4 h-4 text-primary-foreground" />
               </div>
-              {/* Name + email hidden on mobile */}
+              {/* Name + role badge hidden on mobile */}
               <div className="text-left hidden sm:block">
-                <p className="text-xs font-semibold text-foreground leading-none">{adminProfile.name}</p>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-xs font-semibold text-foreground leading-none">{adminProfile.name}</p>
+                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded leading-none ${isStaff ? "bg-teal-100 text-teal-700" : "bg-primary/10 text-primary"}`}>
+                    {isStaff ? "Staff" : "Admin"}
+                  </span>
+                </div>
                 <p className="text-[11px] text-muted-foreground mt-0.5 max-w-[120px] truncate">{adminProfile.email}</p>
               </div>
               <ChevronDown className="w-3.5 h-3.5 text-muted-foreground hidden sm:block" />
@@ -201,13 +210,15 @@ export default function TopNav({ activePage, onNavigate, onSignOut, adminProfile
               <User className="w-3.5 h-3.5 mr-2 text-muted-foreground" />
               Profile
             </DropdownMenuItem>
-            <DropdownMenuItem
-              className="cursor-pointer"
-              onClick={() => onNavigate("change-password")}
-            >
-              <KeyRound className="w-3.5 h-3.5 mr-2 text-muted-foreground" />
-              Change Password
-            </DropdownMenuItem>
+            {!isStaff && (
+              <DropdownMenuItem
+                className="cursor-pointer"
+                onClick={() => onNavigate("change-password")}
+              >
+                <KeyRound className="w-3.5 h-3.5 mr-2 text-muted-foreground" />
+                Change Password
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="cursor-pointer text-destructive focus:text-destructive"

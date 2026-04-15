@@ -20,7 +20,10 @@ import {
   WashingMachine,
   Upload,
   Gift,
+  Users,
+  ScrollText,
 } from "lucide-react";
+import type { UserRole } from "@/lib/auth";
 
 export type Page =
   | "dashboard"
@@ -35,19 +38,30 @@ export type Page =
   | "loyalty"
   | "profile"
   | "change-password"
-  | "settings-data-import";
+  | "settings-data-import"
+  | "staff-management"
+  | "audit-logs";
 
 interface SidebarProps {
   activePage: Page;
   onNavigate: (page: Page) => void;
   loyaltyEnabled: boolean;
+  role?: UserRole;
 }
 
-const navItems = [
+// Top-level nav pages hidden from staff
+const ADMIN_ONLY_NAV_PAGES: Page[] = ["reports", "staff-management", "audit-logs"];
+
+// Settings sub-pages hidden from staff
+const ADMIN_ONLY_SETTINGS: Page[] = ["settings-backup", "settings-data-import"];
+
+const allNavItems = [
   { id: "dashboard" as Page, label: "Dashboard", icon: LayoutDashboard },
   { id: "transactions" as Page, label: "Transactions", icon: Receipt },
   { id: "claim-verification" as Page, label: "Claim Verification", icon: QrCode },
   { id: "reports" as Page, label: "Reports", icon: BarChart3 },
+  { id: "staff-management" as Page, label: "Staff Management", icon: Users },
+  { id: "audit-logs" as Page, label: "Audit Logs", icon: ScrollText },
   { id: "loyalty" as Page, label: "Loyalty Members", icon: Star },
 ];
 
@@ -60,12 +74,23 @@ const settingsSubItems = [
   { id: "settings-data-import" as Page, label: "Data Import", icon: Upload },
 ];
 
-export default function Sidebar({ activePage, onNavigate, loyaltyEnabled }: SidebarProps) {
+export default function Sidebar({ activePage, onNavigate, loyaltyEnabled, role = "admin" }: SidebarProps) {
   // On desktop: user can collapse to icon-only. On tablet (md): starts collapsed.
   const [collapsed, setCollapsed] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(activePage.startsWith("settings"));
 
   const isSettingsActive = activePage.startsWith("settings");
+  const isStaff = role === "staff";
+
+  // Filter nav items based on role
+  const navItems = isStaff
+    ? allNavItems.filter((item) => !ADMIN_ONLY_NAV_PAGES.includes(item.id))
+    : allNavItems;
+
+  // Filter settings sub-items based on role
+  const visibleSettingsSubItems = isStaff
+    ? settingsSubItems.filter((item) => !ADMIN_ONLY_SETTINGS.includes(item.id))
+    : settingsSubItems;
 
   // On mobile the sidebar is shown as a full slide-in drawer (controlled by app-shell)
   // On md (tablet) it starts icon-only; on lg it defaults to full
@@ -124,7 +149,7 @@ export default function Sidebar({ activePage, onNavigate, loyaltyEnabled }: Side
             );
           })}
 
-          {/* Settings with sub-menu */}
+          {/* Settings with sub-menu — filtered by role */}
           <li>
             <button
               onClick={() => {
@@ -153,7 +178,7 @@ export default function Sidebar({ activePage, onNavigate, loyaltyEnabled }: Side
             </button>
             {!effectiveCollapsed && settingsOpen && (
               <ul className="mt-1 ml-3 pl-3 border-l border-sidebar-border space-y-1">
-                {settingsSubItems.map((sub) => {
+                {visibleSettingsSubItems.map((sub) => {
                   const Icon = sub.icon;
                   const active = activePage === sub.id;
                   return (

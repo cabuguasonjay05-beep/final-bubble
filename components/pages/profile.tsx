@@ -1,13 +1,15 @@
 "use client";
 
-import { Camera } from "lucide-react";
+import { Camera, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import type { AdminProfile } from "@/app/page";
+import type { UserProfile } from "@/lib/auth";
 
 interface ProfilePageProps {
-  adminProfile: AdminProfile;
+  userProfile: UserProfile;
+  shopName?: string;
+  contactNumber?: string;
 }
 
 function InfoRow({ label, value }: { label: string; value: string }) {
@@ -19,8 +21,10 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-export default function ProfilePage({ adminProfile }: ProfilePageProps) {
-  const initials = adminProfile.name
+export default function ProfilePage({ userProfile, shopName, contactNumber }: ProfilePageProps) {
+  const isStaff = userProfile.role === "staff";
+
+  const initials = userProfile.name
     .split(" ")
     .map((w) => w[0])
     .join("")
@@ -37,45 +41,69 @@ export default function ProfilePage({ adminProfile }: ProfilePageProps) {
               <div className="w-20 h-20 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-2xl font-semibold select-none">
                 {initials}
               </div>
-              <button className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-card border border-border shadow flex items-center justify-center hover:bg-accent transition-colors cursor-pointer">
-                <Camera className="w-3.5 h-3.5 text-muted-foreground" />
-              </button>
+              {/* Camera overlay — admin only */}
+              {!isStaff && (
+                <button className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-card border border-border shadow flex items-center justify-center hover:bg-accent transition-colors cursor-pointer">
+                  <Camera className="w-3.5 h-3.5 text-muted-foreground" />
+                </button>
+              )}
             </div>
+
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-foreground text-base">{adminProfile.name}</p>
-              <p className="text-sm text-muted-foreground">{adminProfile.email}</p>
-              <div className="mt-1.5 flex items-center gap-2">
-                <Badge variant="secondary" className="text-[11px] px-2 py-0.5">Admin</Badge>
-                <span className="text-[11px] text-muted-foreground">LaundryTrack</span>
+              <p className="font-semibold text-foreground text-base">{userProfile.name}</p>
+              <p className="text-sm text-muted-foreground">{userProfile.email}</p>
+              <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+                {isStaff ? (
+                  <Badge
+                    variant="secondary"
+                    className="text-[11px] px-2 py-0.5 bg-teal-100 text-teal-700 border-teal-200"
+                  >
+                    Staff
+                  </Badge>
+                ) : (
+                  <Badge
+                    variant="secondary"
+                    className="text-[11px] px-2 py-0.5 bg-primary text-primary-foreground"
+                  >
+                    Admin
+                  </Badge>
+                )}
+                <span className="text-[11px] text-muted-foreground">{shopName || "LaundryTrack"}</span>
               </div>
             </div>
-            <div className="ml-auto shrink-0">
-              <Button size="sm" variant="outline" className="text-xs flex items-center gap-1.5 cursor-pointer">
-                <Camera className="w-3.5 h-3.5" />
-                Upload Photo
-              </Button>
-            </div>
+
+            {/* Upload Photo button — admin only */}
+            {!isStaff && (
+              <div className="ml-auto shrink-0">
+                <Button size="sm" variant="outline" className="text-xs flex items-center gap-1.5 cursor-pointer">
+                  <Camera className="w-3.5 h-3.5" />
+                  Upload Photo
+                </Button>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Login credentials — live from Update Login Credentials */}
+      {/* Login Information */}
       <Card className="border border-border shadow-none">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm">Login Information</CardTitle>
           <CardDescription className="text-xs">
-            These values reflect your current login credentials. Update them from Settings → Change Password.
+            {isStaff
+              ? "Your current account credentials as registered by the admin."
+              : "These values reflect your current login credentials. Update them from Settings \u2192 Change Password."}
           </CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
-          <InfoRow label="Full Name"     value={adminProfile.name} />
-          <InfoRow label="Username"      value={adminProfile.username || "—"} />
-          <InfoRow label="Email Address" value={adminProfile.email} />
-          <InfoRow label="Phone Number"  value={adminProfile.phone || "—"} />
+          <InfoRow label="Full Name"     value={userProfile.name} />
+          <InfoRow label="Username"      value={userProfile.username || "\u2014"} />
+          <InfoRow label="Email Address" value={userProfile.email} />
+          <InfoRow label="Phone Number"  value={contactNumber || userProfile.phone || "\u2014"} />
         </CardContent>
       </Card>
 
-      {/* Read-only account details */}
+      {/* Account Details */}
       <Card className="border border-border shadow-none">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm">Account Details</CardTitle>
@@ -84,10 +112,20 @@ export default function ProfilePage({ adminProfile }: ProfilePageProps) {
           </CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
-          <InfoRow label="Role"      value="Admin" />
-          <InfoRow label="Shop Name" value="LaundryTrack" />
+          <InfoRow label="Role"      value={isStaff ? "Staff" : "Admin"} />
+          <InfoRow label="Shop Name" value={shopName || "LaundryTrack"} />
         </CardContent>
       </Card>
+
+      {/* Staff-only info note */}
+      {isStaff && (
+        <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/40 px-4 py-3">
+          <Info className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            To update your profile information or change your password, please contact your administrator.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

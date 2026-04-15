@@ -20,6 +20,7 @@ import {
   WashingMachine,
   Upload,
   Gift,
+  Users,
 } from "lucide-react";
 import type { UserRole } from "@/lib/auth";
 
@@ -36,7 +37,8 @@ export type Page =
   | "loyalty"
   | "profile"
   | "change-password"
-  | "settings-data-import";
+  | "settings-data-import"
+  | "staff-management";
 
 interface SidebarProps {
   activePage: Page;
@@ -46,7 +48,7 @@ interface SidebarProps {
 }
 
 // Top-level nav pages hidden from staff
-const ADMIN_ONLY_NAV_PAGES: Page[] = ["reports"];
+const ADMIN_ONLY_NAV_PAGES: Page[] = ["reports", "staff-management"];
 
 // Settings sub-pages hidden from staff
 const ADMIN_ONLY_SETTINGS: Page[] = ["settings-backup", "settings-data-import"];
@@ -56,6 +58,7 @@ const allNavItems = [
   { id: "transactions" as Page, label: "Transactions", icon: Receipt },
   { id: "claim-verification" as Page, label: "Claim Verification", icon: QrCode },
   { id: "reports" as Page, label: "Reports", icon: BarChart3 },
+  { id: "staff-management" as Page, label: "Staff Management", icon: Users },
   { id: "loyalty" as Page, label: "Loyalty Members", icon: Star },
 ];
 

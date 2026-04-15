@@ -32,6 +32,7 @@ const pageTitles: Record<Page, string> = {
   "settings-business-profile": "Settings — Business Profile",
   "settings-backup": "Settings — Backup & Restore",
   "settings-loyalty": "Settings — Loyalty Program",
+  "staff-management": "Staff Management",
   loyalty: "Loyalty Members",
   profile: "My Profile",
   "change-password": "Change Password",
@@ -58,6 +59,7 @@ interface TopNavProps {
 }
 
 export default function TopNav({ activePage, onNavigate, onSignOut, adminProfile, onMenuToggle, onTransactionDetail }: TopNavProps) {
+  const isStaff = adminProfile.role === "staff";
   const [notifications, setNotifications] = useState<Notification[]>(initialNotifications);
   const [notifOpen, setNotifOpen] = useState(false);
   const [signOutOpen, setSignOutOpen] = useState(false);
@@ -202,13 +204,15 @@ export default function TopNav({ activePage, onNavigate, onSignOut, adminProfile
               <User className="w-3.5 h-3.5 mr-2 text-muted-foreground" />
               Profile
             </DropdownMenuItem>
-            <DropdownMenuItem
-              className="cursor-pointer"
-              onClick={() => onNavigate("change-password")}
-            >
-              <KeyRound className="w-3.5 h-3.5 mr-2 text-muted-foreground" />
-              Change Password
-            </DropdownMenuItem>
+            {!isStaff && (
+              <DropdownMenuItem
+                className="cursor-pointer"
+                onClick={() => onNavigate("change-password")}
+              >
+                <KeyRound className="w-3.5 h-3.5 mr-2 text-muted-foreground" />
+                Change Password
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="cursor-pointer text-destructive focus:text-destructive"

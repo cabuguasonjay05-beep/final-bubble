@@ -15,6 +15,7 @@ import LoyaltyPage from "@/components/pages/loyalty";
 import ProfilePage from "@/components/pages/profile";
 import ChangePasswordPage from "@/components/pages/change-password";
 import DataImportPage from "@/components/pages/data-import";
+import StaffManagementPage from "@/components/pages/staff-management";
 import type { UserProfile } from "@/lib/auth";
 import { toast } from "@/hooks/use-toast";
 
@@ -57,6 +58,7 @@ export default function AppShell({ onSignOut, adminProfile, onProfileUpdate }: A
         return <SettingsPage page={activePage} loyaltyEnabled={loyaltyEnabled} onLoyaltyEnabledChange={setLoyaltyEnabled} />;
       case "settings-data-import":
         return <DataImportPage onViewTransactions={() => handleNavigate("transactions")} />;
+      case "staff-management": return <StaffManagementPage />;
       case "loyalty": return <LoyaltyPage loyaltyEnabled={loyaltyEnabled} />;
       case "profile": return <ProfilePage userProfile={adminProfile} />;
       case "change-password": return <ChangePasswordPage adminProfile={adminProfile} onProfileUpdate={onProfileUpdate} />;
@@ -69,6 +71,7 @@ export default function AppShell({ onSignOut, adminProfile, onProfileUpdate }: A
     "reports",
     "settings-backup",
     "settings-data-import",
+    "staff-management",
   ];
 
   const handleNavigate = (page: Page) => {

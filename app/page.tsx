@@ -7,7 +7,6 @@ import StaffLoginPage from "@/components/pages/staff-login";
 import ForgotPasswordPage from "@/components/pages/forgot-password";
 import RegisterPage from "@/components/pages/register";
 import type { UserProfile } from "@/lib/auth";
-import { authenticateAdmin } from "@/lib/auth";
 
 // ── Legacy type alias kept for ChangePasswordPage compat ──────────────────────
 export interface AdminProfile {
@@ -23,11 +22,8 @@ export default function Home() {
   const [view, setView] = useState<AuthView>("role-select");
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
-  // ── Admin login handler (uses mock auth, matches existing UX) ──────────────
-  const handleAdminLogin = () => {
-    // The existing LoginPage does its own minimal validation.
-    // We set a default admin profile here since LoginPage doesn't return credentials.
-    const profile = authenticateAdmin("admin", "admin123")!;
+  // ── Admin login handler ────────────────────────────────────────────────────
+  const handleAdminLogin = (profile: UserProfile) => {
     setUserProfile(profile);
     setView("app");
   };

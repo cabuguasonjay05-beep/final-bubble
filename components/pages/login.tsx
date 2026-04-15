@@ -1,13 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { Eye, EyeOff, WashingMachine } from "lucide-react";
+import { Eye, EyeOff, WashingMachine, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { authenticateAdmin } from "@/lib/auth";
+import type { UserProfile } from "@/lib/auth";
+
+// TODO: Replace mock auth with Supabase auth
 
 interface LoginPageProps {
-  onLogin: () => void;
+  onLogin: (profile: UserProfile) => void;
   onForgotPassword: () => void;
   onCreateAccount: () => void;
   onBack?: () => void;
@@ -18,15 +22,21 @@ export default function LoginPage({ onLogin, onForgotPassword, onCreateAccount, 
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showHint, setShowHint] = useState(false);
 
   const handleLogin = () => {
     if (!email.trim() || !password.trim()) {
-      setError(true);
+      setError("Please fill in all fields.");
       return;
     }
-    setError(false);
-    onLogin();
+    const profile = authenticateAdmin(email, password);
+    if (!profile) {
+      setError("Invalid email or password.");
+      return;
+    }
+    setError(null);
+    onLogin(profile);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -39,8 +49,7 @@ export default function LoginPage({ onLogin, onForgotPassword, onCreateAccount, 
       <div
         className="absolute inset-0 opacity-[0.06] pointer-events-none"
         style={{
-          backgroundImage:
-            "radial-gradient(circle, #ffffff 1px, transparent 1px)",
+          backgroundImage: "radial-gradient(circle, #ffffff 1px, transparent 1px)",
           backgroundSize: "32px 32px",
         }}
       />
@@ -74,7 +83,7 @@ export default function LoginPage({ onLogin, onForgotPassword, onCreateAccount, 
           {/* Error banner */}
           {error && (
             <div className="mb-4 rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-2 text-xs text-destructive font-medium text-center">
-              Please fill in all fields.
+              {error}
             </div>
           )}
 
@@ -82,14 +91,14 @@ export default function LoginPage({ onLogin, onForgotPassword, onCreateAccount, 
             {/* Email */}
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="email" className="text-xs font-medium text-foreground">
-                Email or Username
+                Email
               </Label>
               <Input
                 id="email"
                 type="email"
                 placeholder="admin@laundrytrack.ph"
                 value={email}
-                onChange={(e) => { setEmail(e.target.value); setError(false); }}
+                onChange={(e) => { setEmail(e.target.value); setError(null); }}
                 onKeyDown={handleKeyDown}
                 className={error && !email.trim() ? "border-destructive focus-visible:ring-destructive" : ""}
                 autoComplete="email"
@@ -107,7 +116,7 @@ export default function LoginPage({ onLogin, onForgotPassword, onCreateAccount, 
                   type={showPassword ? "text" : "password"}
                   placeholder="Enter your password"
                   value={password}
-                  onChange={(e) => { setPassword(e.target.value); setError(false); }}
+                  onChange={(e) => { setPassword(e.target.value); setError(null); }}
                   onKeyDown={handleKeyDown}
                   className={`pr-10 ${error && !password.trim() ? "border-destructive focus-visible:ring-destructive" : ""}`}
                   autoComplete="current-password"
@@ -135,12 +144,30 @@ export default function LoginPage({ onLogin, onForgotPassword, onCreateAccount, 
             </label>
 
             {/* Login button */}
-            <Button
-              className="w-full mt-1 cursor-pointer"
-              onClick={handleLogin}
-            >
+            <Button className="w-full mt-1 cursor-pointer" onClick={handleLogin}>
               Login
             </Button>
+
+            {/* Demo credentials hint */}
+            <div className="rounded-lg bg-blue-50 border border-blue-200 overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setShowHint((v) => !v)}
+                className="w-full flex items-center justify-between px-3 py-2 text-[11px] font-medium text-blue-700 hover:bg-blue-100 transition-colors cursor-pointer"
+              >
+                <span>&#128273; Demo Credentials (for testing only)</span>
+                {showHint
+                  ? <ChevronUp className="w-3.5 h-3.5 shrink-0" />
+                  : <ChevronDown className="w-3.5 h-3.5 shrink-0" />
+                }
+              </button>
+              {showHint && (
+                <div className="px-3 pb-3 pt-1 text-[11px] text-blue-800 space-y-1 border-t border-blue-200 bg-blue-50">
+                  <p><span className="font-semibold">Email:</span> admin@laundrytrack.ph</p>
+                  <p><span className="font-semibold">Password:</span> admin123</p>
+                </div>
+              )}
+            </div>
 
             {/* Forgot password */}
             <button

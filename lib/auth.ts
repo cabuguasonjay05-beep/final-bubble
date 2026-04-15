@@ -11,9 +11,39 @@ export interface UserProfile {
 }
 
 // ── Mock credential store ─────────────────────────────────────────────────────
+// TODO: Replace mock auth with Supabase auth
 // In a real app these would live in a database with hashed passwords.
 
-const ADMIN_CREDENTIALS = { username: "admin", password: "admin123" };
+interface AdminAccount {
+  email: string;
+  password: string;
+  profile: UserProfile;
+}
+
+const ADMIN_ACCOUNTS: AdminAccount[] = [
+  {
+    email: "admin@laundrytrack.ph",
+    password: "admin123",
+    profile: {
+      name: "Admin User",
+      email: "admin@laundrytrack.ph",
+      username: "admin",
+      phone: "+63 912 345 6789",
+      role: "admin",
+    },
+  },
+  {
+    email: "owner@laundrytrack.ph",
+    password: "owner123",
+    profile: {
+      name: "Owner",
+      email: "owner@laundrytrack.ph",
+      username: "owner",
+      phone: "+63 912 345 6780",
+      role: "admin",
+    },
+  },
+];
 
 export interface StaffAccount {
   username: string;
@@ -47,20 +77,11 @@ export const staffAccounts: StaffAccount[] = [
 
 // ── Auth helpers ──────────────────────────────────────────────────────────────
 
-export function authenticateAdmin(username: string, password: string): UserProfile | null {
-  if (
-    username.trim().toLowerCase() === ADMIN_CREDENTIALS.username &&
-    password === ADMIN_CREDENTIALS.password
-  ) {
-    return {
-      name: "Admin User",
-      email: "admin@laundrytrack.ph",
-      username: "admin",
-      phone: "+63 912 345 6789",
-      role: "admin",
-    };
-  }
-  return null;
+export function authenticateAdmin(email: string, password: string): UserProfile | null {
+  const account = ADMIN_ACCOUNTS.find(
+    (a) => a.email.toLowerCase() === email.trim().toLowerCase() && a.password === password
+  );
+  return account ? account.profile : null;
 }
 
 export function authenticateStaff(username: string, password: string): UserProfile | null {

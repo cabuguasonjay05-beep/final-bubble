@@ -21,6 +21,7 @@ import {
   Upload,
   Gift,
   Users,
+  ScrollText,
 } from "lucide-react";
 import type { UserRole } from "@/lib/auth";
 
@@ -38,7 +39,8 @@ export type Page =
   | "profile"
   | "change-password"
   | "settings-data-import"
-  | "staff-management";
+  | "staff-management"
+  | "audit-logs";
 
 interface SidebarProps {
   activePage: Page;
@@ -48,7 +50,7 @@ interface SidebarProps {
 }
 
 // Top-level nav pages hidden from staff
-const ADMIN_ONLY_NAV_PAGES: Page[] = ["reports", "staff-management"];
+const ADMIN_ONLY_NAV_PAGES: Page[] = ["reports", "staff-management", "audit-logs"];
 
 // Settings sub-pages hidden from staff
 const ADMIN_ONLY_SETTINGS: Page[] = ["settings-backup", "settings-data-import"];
@@ -59,6 +61,7 @@ const allNavItems = [
   { id: "claim-verification" as Page, label: "Claim Verification", icon: QrCode },
   { id: "reports" as Page, label: "Reports", icon: BarChart3 },
   { id: "staff-management" as Page, label: "Staff Management", icon: Users },
+  { id: "audit-logs" as Page, label: "Audit Logs", icon: ScrollText },
   { id: "loyalty" as Page, label: "Loyalty Members", icon: Star },
 ];
 

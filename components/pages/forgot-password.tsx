@@ -1,5 +1,7 @@
 "use client";
 
+// TODO: Replace with real Supabase resetPasswordForEmail() when backend is ready
+
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
   WashingMachine,
@@ -7,40 +9,35 @@ import {
   CheckCircle2,
   Eye,
   EyeOff,
-  ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { toast } from "@/hooks/use-toast";
-import { authenticateAdmin } from "@/lib/auth";
 
 interface ForgotPasswordPageProps {
   onBack: () => void;
 }
 
-type Step = 1 | 2 | 3 | "success";
+type Step = 1 | "1-success" | 2 | 3 | "success";
 
-const MOCK_VALID_CODE = "123456";
+// Mock accounts: email → reset code
+const MOCK_ACCOUNTS: Record<string, string> = {
+  "admin@laundrytrack.ph": "123456",
+  "owner@laundrytrack.ph": "654321",
+};
+
+const CODE_COUNTDOWN = 300; // 5 minutes
 const RESEND_COUNTDOWN = 60;
 
-// Mask email: cab***@gmail.com
 function maskEmail(email: string): string {
   const [local, domain] = email.split("@");
   if (!domain) return email;
-  const visible = local.slice(0, 3);
-  return `${visible}***@${domain}`;
+  return `${local.slice(0, 3)}***@${domain}`;
 }
 
-// Password strength helpers
-function getStrength(pw: string): { score: 0 | 1 | 2 | 3; labels: string[] } {
-  const checks = [
-    pw.length >= 8,
-    /[0-9]/.test(pw),
-    /[A-Z]/.test(pw),
-  ];
-  const score = checks.filter(Boolean).length as 0 | 1 | 2 | 3;
-  return { score, labels: checks.map((c, i) => (c ? "met" : ["length", "number", "uppercase"][i])) };
+function getStrength(pw: string): 0 | 1 | 2 | 3 {
+  const checks = [pw.length >= 8, /[0-9]/.test(pw), /[A-Z]/.test(pw)];
+  return checks.filter(Boolean).length as 0 | 1 | 2 | 3;
 }
 
 export default function ForgotPasswordPage({ onBack }: ForgotPasswordPageProps) {
@@ -50,15 +47,19 @@ export default function ForgotPasswordPage({ onBack }: ForgotPasswordPageProps) 
   const [email, setEmail] = useState("");
   const [step1Error, setStep1Error] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  // Auto-advance countdown after success state
+  const [continueCountdown, setContinueCountdown] = useState(2);
 
-  // Step 2 — 6 separate digit boxes
+  // Step 2
   const [digits, setDigits] = useState<string[]>(Array(6).fill(""));
   const [step2Error, setStep2Error] = useState<string | null>(null);
   const [shake, setShake] = useState(false);
-  const [countdown, setCountdown] = useState(RESEND_COUNTDOWN);
+  const [codeCountdown, setCodeCountdown] = useState(CODE_COUNTDOWN);
+  const [resendCountdown, setResendCountdown] = useState(RESEND_COUNTDOWN);
   const [canResend, setCanResend] = useState(false);
   const digitRefs = useRef<(HTMLInputElement | null)[]>([]);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const codeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const resendTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Step 3
   const [newPassword, setNewPassword] = useState("");
@@ -67,18 +68,46 @@ export default function ForgotPasswordPage({ onBack }: ForgotPasswordPageProps) 
   const [showConfirm, setShowConfirm] = useState(false);
   const [step3Error, setStep3Error] = useState<string | null>(null);
 
-  // Success auto-redirect
+  // Success redirect countdown
   const [redirectCountdown, setRedirectCountdown] = useState(5);
 
-  // ── Countdown timer for resend ─────────────────────────────────────────────
-  const startCountdown = useCallback(() => {
-    setCountdown(RESEND_COUNTDOWN);
-    setCanResend(false);
-    if (timerRef.current) clearInterval(timerRef.current);
-    timerRef.current = setInterval(() => {
-      setCountdown((c) => {
+  // ── Auto-advance after 1-success state ───────────────────────────────────
+  useEffect(() => {
+    if (step !== "1-success") return;
+    setContinueCountdown(2);
+    const t = setInterval(() => {
+      setContinueCountdown((c) => {
         if (c <= 1) {
-          clearInterval(timerRef.current!);
+          clearInterval(t);
+          setStep(2);
+          return 0;
+        }
+        return c - 1;
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [step]);
+
+  // ── Start countdown timers when entering Step 2 ───────────────────────────
+  const startTimers = useCallback(() => {
+    // Code expiry
+    setCodeCountdown(CODE_COUNTDOWN);
+    if (codeTimerRef.current) clearInterval(codeTimerRef.current);
+    codeTimerRef.current = setInterval(() => {
+      setCodeCountdown((c) => {
+        if (c <= 1) { clearInterval(codeTimerRef.current!); return 0; }
+        return c - 1;
+      });
+    }, 1000);
+
+    // Resend cooldown
+    setResendCountdown(RESEND_COUNTDOWN);
+    setCanResend(false);
+    if (resendTimerRef.current) clearInterval(resendTimerRef.current);
+    resendTimerRef.current = setInterval(() => {
+      setResendCountdown((c) => {
+        if (c <= 1) {
+          clearInterval(resendTimerRef.current!);
           setCanResend(true);
           return 0;
         }
@@ -88,85 +117,65 @@ export default function ForgotPasswordPage({ onBack }: ForgotPasswordPageProps) 
   }, []);
 
   useEffect(() => {
-    if (step === 2) startCountdown();
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [step, startCountdown]);
+    if (step === 2) startTimers();
+    return () => {
+      if (codeTimerRef.current) clearInterval(codeTimerRef.current);
+      if (resendTimerRef.current) clearInterval(resendTimerRef.current);
+    };
+  }, [step, startTimers]);
 
-  // ── Auto-redirect countdown on success ────────────────────────────────────
+  // ── Auto-redirect on success ──────────────────────────────────────────────
   useEffect(() => {
     if (step !== "success") return;
+    setRedirectCountdown(5);
     const t = setInterval(() => {
       setRedirectCountdown((c) => {
-        if (c <= 1) {
-          clearInterval(t);
-          onBack();
-          return 0;
-        }
+        if (c <= 1) { clearInterval(t); onBack(); return 0; }
         return c - 1;
       });
     }, 1000);
     return () => clearInterval(t);
   }, [step, onBack]);
 
-  // ── Step 1: Send reset code ────────────────────────────────────────────────
+  // ── Format mm:ss ──────────────────────────────────────────────────────────
+  function formatTime(s: number) {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${m}:${String(sec).padStart(2, "0")}`;
+  }
+
+  // ── Step 1: Send reset code ───────────────────────────────────────────────
   const handleSendCode = async () => {
-    if (!email.trim()) {
-      setStep1Error("Please enter your email address.");
-      return;
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+    const trimmed = email.trim().toLowerCase();
+    if (!trimmed) { setStep1Error("Please enter your email address."); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
       setStep1Error("Please enter a valid email address.");
       return;
     }
     setSending(true);
     setStep1Error(null);
-    // Simulate network delay
-    await new Promise((r) => setTimeout(r, 1200));
+    await new Promise((r) => setTimeout(r, 1000));
     setSending(false);
 
-    // For demo, only registered admin emails work
-    const found = authenticateAdmin(email.trim(), "__any__") !== null ||
-      ["admin@laundrytrack.ph", "owner@laundrytrack.ph"].includes(email.trim().toLowerCase());
-
-    if (!found) {
+    if (!MOCK_ACCOUNTS[trimmed]) {
       setStep1Error("No account found with this email address.");
       return;
     }
 
-    toast({ title: "Reset code sent to your email!" });
-    setTimeout(() => setStep(2), 1000);
+    setEmail(trimmed);
+    setStep("1-success");
   };
 
-  // ── Step 2: Verify code ────────────────────────────────────────────────────
-  const handleVerifyCode = () => {
-    const code = digits.join("");
-    if (code.length < 6) {
-      triggerShake("Please enter the complete 6-digit code.");
-      return;
-    }
-    if (code !== MOCK_VALID_CODE) {
-      triggerShake("Invalid code. Please try again.");
-      return;
-    }
-    setStep2Error(null);
-    setStep(3);
-  };
+  const mockCode = MOCK_ACCOUNTS[email] ?? "";
 
-  const triggerShake = (msg: string) => {
-    setStep2Error(msg);
-    setShake(true);
-    setTimeout(() => setShake(false), 600);
-  };
-
+  // ── Step 2: Digit handling ────────────────────────────────────────────────
   const handleDigitChange = (index: number, value: string) => {
     const char = value.replace(/\D/g, "").slice(-1);
     const next = [...digits];
     next[index] = char;
     setDigits(next);
     setStep2Error(null);
-    if (char && index < 5) {
-      digitRefs.current[index + 1]?.focus();
-    }
+    if (char && index < 5) digitRefs.current[index + 1]?.focus();
   };
 
   const handleDigitKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -185,33 +194,39 @@ export default function ForgotPasswordPage({ onBack }: ForgotPasswordPageProps) 
     e.preventDefault();
   };
 
+  const triggerShake = (msg: string) => {
+    setStep2Error(msg);
+    setShake(true);
+    setTimeout(() => setShake(false), 600);
+  };
+
+  const handleVerifyCode = () => {
+    const code = digits.join("");
+    if (code.length < 6) { triggerShake("Please enter the complete 6-digit code."); return; }
+    // All same digits check
+    if (new Set(code.split("")).size === 1) { triggerShake("Invalid code format."); return; }
+    if (code !== mockCode) { triggerShake("Incorrect code. Please try again."); return; }
+    setStep2Error(null);
+    setStep(3);
+  };
+
   const handleResend = () => {
     if (!canResend) return;
-    toast({ title: "New code sent!" });
     setDigits(Array(6).fill(""));
     setStep2Error(null);
-    startCountdown();
+    startTimers();
     digitRefs.current[0]?.focus();
   };
 
-  // ── Step 3: Set new password ───────────────────────────────────────────────
-  const { score: strengthScore } = getStrength(newPassword);
+  // ── Step 3: Strength ──────────────────────────────────────────────────────
+  const strengthScore = getStrength(newPassword);
   const strengthLabel = ["", "Weak", "Fair", "Strong"][strengthScore];
   const strengthColor = ["", "bg-red-400", "bg-yellow-400", "bg-green-500"][strengthScore];
 
   const handleResetPassword = () => {
-    if (!newPassword) {
-      setStep3Error("Please enter a new password.");
-      return;
-    }
-    if (newPassword.length < 8) {
-      setStep3Error("Password must be at least 8 characters.");
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      setStep3Error("Passwords do not match.");
-      return;
-    }
+    if (!newPassword) { setStep3Error("Please enter a new password."); return; }
+    if (newPassword.length < 8) { setStep3Error("Password must be at least 8 characters."); return; }
+    if (newPassword !== confirmPassword) { setStep3Error("Passwords do not match."); return; }
     setStep3Error(null);
     sessionStorage.setItem("prefill_email", email);
     sessionStorage.setItem("prefill_password", newPassword);
@@ -219,7 +234,28 @@ export default function ForgotPasswordPage({ onBack }: ForgotPasswordPageProps) 
     setStep("success");
   };
 
-  // ── Shared wrapper ─────────────────────────────────────────────────────────
+  // ── Shared step indicator ─────────────────────────────────────────────────
+  function StepIndicator({ current }: { current: 1 | 2 | 3 }) {
+    return (
+      <div className="flex items-center justify-center gap-1.5 mb-5">
+        {([1, 2, 3] as const).map((n, i) => (
+          <div key={n} className="flex items-center gap-1.5">
+            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold transition-colors
+              ${n < current ? "bg-primary text-primary-foreground" :
+                n === current ? "bg-primary text-primary-foreground" :
+                "border border-muted-foreground/30 text-muted-foreground"}`}>
+              {n < current ? <CheckCircle2 className="w-3.5 h-3.5" /> : n}
+            </span>
+            {i < 2 && (
+              <div className={`w-6 h-px ${n < current ? "bg-primary" : "bg-muted-foreground/30"}`} />
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // ── Shared card wrapper ───────────────────────────────────────────────────
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#0c249c] px-4">
       <div
@@ -233,7 +269,7 @@ export default function ForgotPasswordPage({ onBack }: ForgotPasswordPageProps) 
       <div className="relative w-full max-w-sm">
         <div className="bg-card rounded-2xl shadow-lg border border-border px-8 py-10">
 
-          {/* Logo */}
+          {/* Logo — always visible */}
           <div className="flex flex-col items-center mb-7">
             <div className="w-14 h-14 rounded-2xl bg-primary flex items-center justify-center shadow-md mb-3">
               <WashingMachine className="w-7 h-7 text-primary-foreground" />
@@ -247,7 +283,7 @@ export default function ForgotPasswordPage({ onBack }: ForgotPasswordPageProps) 
             <>
               <h1 className="text-base font-semibold text-foreground text-center mb-1">Forgot Password</h1>
               <p className="text-xs text-muted-foreground text-center mb-6 leading-relaxed">
-                Enter your email address and we&apos;ll send you a reset code.
+                Enter your admin email and we&apos;ll send you a reset code.
               </p>
 
               {step1Error && (
@@ -287,23 +323,60 @@ export default function ForgotPasswordPage({ onBack }: ForgotPasswordPageProps) 
             </>
           )}
 
-          {/* ── STEP 2: Verify Code ─────────────────────────────────────── */}
-          {step === 2 && (
-            <>
-              {/* Step indicator */}
-              <div className="flex items-center justify-center gap-1.5 mb-5 text-[11px] text-muted-foreground">
-                <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px] font-bold">1</span>
-                <div className="w-6 h-px bg-primary" />
-                <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px] font-bold">2</span>
-                <div className="w-6 h-px bg-muted-foreground/30" />
-                <span className="w-5 h-5 rounded-full border border-muted-foreground/30 flex items-center justify-center text-[10px] font-medium text-muted-foreground">3</span>
+          {/* ── STEP 1-SUCCESS: Code Sent ───────────────────────────────── */}
+          {step === "1-success" && (
+            <div className="flex flex-col items-center gap-4 text-center">
+              <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center">
+                <CheckCircle2 className="w-8 h-8 text-green-600" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-foreground">Reset Code Sent!</p>
+                <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
+                  We&apos;ve sent a 6-digit code to{" "}
+                  <span className="font-semibold text-foreground">{maskEmail(email)}</span>
+                </p>
               </div>
 
-              <h1 className="text-base font-semibold text-foreground text-center mb-1">Check Your Email</h1>
-              <p className="text-xs text-muted-foreground text-center mb-1 leading-relaxed">
-                We sent a 6-digit code to
+              {/* Demo hint box */}
+              <div className="w-full rounded-lg bg-blue-50 border border-blue-200 px-3 py-2.5 text-xs text-blue-800">
+                <p className="font-semibold mb-0.5">Demo mode</p>
+                <p>Your code is: <span className="font-bold tracking-widest">{mockCode}</span></p>
+              </div>
+
+              <Button className="w-full cursor-pointer" onClick={() => setStep(2)}>
+                Continue &rarr;
+              </Button>
+
+              <p className="text-[11px] text-muted-foreground">
+                Auto-continuing in {continueCountdown}s...
               </p>
-              <p className="text-xs font-semibold text-foreground text-center mb-5">{maskEmail(email)}</p>
+
+              <button
+                type="button"
+                onClick={onBack}
+                className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                Back to Login
+              </button>
+            </div>
+          )}
+
+          {/* ── STEP 2: Enter Code ─────────────────────────────────────── */}
+          {step === 2 && (
+            <>
+              <StepIndicator current={2} />
+
+              <h1 className="text-base font-semibold text-foreground text-center mb-1">Enter Verification Code</h1>
+              <p className="text-xs text-muted-foreground text-center mb-1 leading-relaxed">
+                Enter the 6-digit code sent to
+              </p>
+              <p className="text-xs font-semibold text-foreground text-center mb-1">{maskEmail(email)}</p>
+
+              {/* Expiry countdown */}
+              <p className={`text-[11px] text-center mb-5 font-medium ${codeCountdown <= 60 ? "text-destructive" : "text-muted-foreground"}`}>
+                Code expires in {formatTime(codeCountdown)}
+              </p>
 
               {step2Error && (
                 <div className="mb-3 rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-2 text-xs text-destructive font-medium text-center">
@@ -311,9 +384,9 @@ export default function ForgotPasswordPage({ onBack }: ForgotPasswordPageProps) 
                 </div>
               )}
 
-              {/* 6-box code input */}
+              {/* 6-box OTP input */}
               <div
-                className={`flex gap-2 justify-center mb-5 ${shake ? "animate-[shake_0.5s_ease-in-out]" : ""}`}
+                className={`flex gap-2 justify-center mb-4 ${shake ? "animate-shake" : ""}`}
                 style={shake ? { animation: "shake 0.5s ease-in-out" } : {}}
               >
                 <style>{`
@@ -344,16 +417,16 @@ export default function ForgotPasswordPage({ onBack }: ForgotPasswordPageProps) 
                 ))}
               </div>
 
-              <p className="text-[11px] text-muted-foreground text-center mb-4">
-                Demo code: <span className="font-semibold text-foreground">123456</span>
-              </p>
+              {/* Demo hint */}
+              <div className="mb-4 rounded-lg bg-blue-50 border border-blue-200 px-3 py-2 text-xs text-blue-800 text-center">
+                Demo mode: use code <span className="font-bold tracking-widest">{mockCode}</span>
+              </div>
 
               <div className="flex flex-col gap-3">
                 <Button className="w-full cursor-pointer" onClick={handleVerifyCode}>
                   Verify Code
                 </Button>
 
-                {/* Resend section */}
                 <p className="text-xs text-muted-foreground text-center">
                   Didn&apos;t receive a code?{" "}
                   {canResend ? (
@@ -366,14 +439,14 @@ export default function ForgotPasswordPage({ onBack }: ForgotPasswordPageProps) 
                     </button>
                   ) : (
                     <span className="font-medium text-muted-foreground">
-                      Resend in 0:{String(countdown).padStart(2, "0")}
+                      Resend in 0:{String(resendCountdown).padStart(2, "0")}
                     </span>
                   )}
                 </p>
 
                 <button
                   type="button"
-                  onClick={() => { setDigits(Array(6).fill("")); setStep(1); }}
+                  onClick={() => { setDigits(Array(6).fill("")); setStep2Error(null); setStep(1); }}
                   className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
@@ -383,21 +456,14 @@ export default function ForgotPasswordPage({ onBack }: ForgotPasswordPageProps) 
             </>
           )}
 
-          {/* ── STEP 3: Set New Password ─────────────────────────────────── */}
+          {/* ── STEP 3: Reset Password ──────────────────────────────────── */}
           {step === 3 && (
             <>
-              {/* Step indicator */}
-              <div className="flex items-center justify-center gap-1.5 mb-5 text-[11px] text-muted-foreground">
-                <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px] font-bold">1</span>
-                <div className="w-6 h-px bg-primary" />
-                <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px] font-bold">2</span>
-                <div className="w-6 h-px bg-primary" />
-                <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px] font-bold">3</span>
-              </div>
+              <StepIndicator current={3} />
 
-              <h1 className="text-base font-semibold text-foreground text-center mb-1">Set New Password</h1>
+              <h1 className="text-base font-semibold text-foreground text-center mb-1">Reset Password</h1>
               <p className="text-xs text-muted-foreground text-center mb-6 leading-relaxed">
-                Create a strong new password for your account.
+                Enter your new password below.
               </p>
 
               {step3Error && (
@@ -430,20 +496,16 @@ export default function ForgotPasswordPage({ onBack }: ForgotPasswordPageProps) 
                     </button>
                   </div>
 
-                  {/* Strength indicator */}
+                  {/* Strength bar */}
                   {newPassword.length > 0 && (
                     <div className="mt-1">
                       <div className="flex gap-1 mb-1.5">
                         {[1, 2, 3].map((level) => (
-                          <div
-                            key={level}
-                            className={`h-1 flex-1 rounded-full transition-colors ${strengthScore >= level ? strengthColor : "bg-muted"}`}
-                          />
+                          <div key={level} className={`h-1 flex-1 rounded-full transition-colors ${strengthScore >= level ? strengthColor : "bg-muted"}`} />
                         ))}
                       </div>
                       {strengthLabel && (
-                        <p className={`text-[11px] font-medium mb-1.5
-                          ${strengthScore === 1 ? "text-red-500" : strengthScore === 2 ? "text-yellow-500" : "text-green-600"}`}>
+                        <p className={`text-[11px] font-medium mb-1.5 ${strengthScore === 1 ? "text-red-500" : strengthScore === 2 ? "text-yellow-500" : "text-green-600"}`}>
                           {strengthLabel}
                         </p>
                       )}
@@ -493,7 +555,7 @@ export default function ForgotPasswordPage({ onBack }: ForgotPasswordPageProps) 
 
                 <button
                   type="button"
-                  onClick={() => setStep(2)}
+                  onClick={() => { setStep3Error(null); setStep(2); }}
                   className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
@@ -505,25 +567,23 @@ export default function ForgotPasswordPage({ onBack }: ForgotPasswordPageProps) 
 
           {/* ── SUCCESS ─────────────────────────────────────────────────── */}
           {step === "success" && (
-            <div className="flex flex-col items-center text-center gap-4">
-              <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
-                <CheckCircle2 className="w-9 h-9 text-green-600" />
+            <div className="flex flex-col items-center gap-4 text-center">
+              <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center">
+                <CheckCircle2 className="w-8 h-8 text-green-600" />
               </div>
               <div>
-                <h1 className="text-base font-semibold text-foreground">Password Reset Successful!</h1>
-                <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
-                  Your password has been updated. You can now log in with your new password.
+                <p className="text-sm font-semibold text-foreground">Password Reset Successful!</p>
+                <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
+                  You can now log in with your new password.
                 </p>
               </div>
-              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground bg-muted/50 border border-border rounded-lg px-3 py-2 w-full justify-center">
-                <ShieldCheck className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
-                For security, all other sessions have been logged out.
-              </div>
+
               <Button className="w-full cursor-pointer" onClick={onBack}>
-                Back to Login
+                &rarr; Go to Login
               </Button>
+
               <p className="text-[11px] text-muted-foreground">
-                Redirecting to login in {redirectCountdown}...
+                Redirecting in {redirectCountdown}s...
               </p>
             </div>
           )}

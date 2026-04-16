@@ -65,6 +65,9 @@ export default function RegisterPage({ onBack }: RegisterPageProps) {
     const errs = validate();
     setErrors(errs);
     if (Object.keys(errs).length === 0) {
+      // Store credentials so Login page can auto-fill them
+      sessionStorage.setItem("prefill_email", email);
+      sessionStorage.setItem("prefill_password", password);
       setSuccess(true);
     }
   };
@@ -101,13 +104,23 @@ export default function RegisterPage({ onBack }: RegisterPageProps) {
 
           <h1 className="text-base font-semibold text-foreground text-center mb-5">Create Admin Account</h1>
 
-          {/* Success banner */}
-          {success && (
-            <div className="mb-4 flex items-start gap-2 rounded-lg bg-green-50 border border-green-200 px-3 py-2.5 text-xs text-green-800 font-medium">
-              <CheckCircle2 className="w-4 h-4 shrink-0 text-green-600 mt-0.5" />
-              Account created successfully! You can now log in.
+          {/* Success state — replaces form */}
+          {success ? (
+            <div className="flex flex-col items-center gap-4 py-4 text-center">
+              <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center">
+                <CheckCircle2 className="w-8 h-8 text-green-600" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-foreground">Account Created Successfully!</p>
+                <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+                  Your admin account has been created. Click below to proceed to login &mdash; your credentials have been filled in automatically.
+                </p>
+              </div>
+              <Button className="w-full cursor-pointer" onClick={onBack}>
+                Go to Login
+              </Button>
             </div>
-          )}
+          ) : (
 
           <div className="flex flex-col gap-4">
             {/* Full Name */}
@@ -247,6 +260,7 @@ export default function RegisterPage({ onBack }: RegisterPageProps) {
               </button>
             </p>
           </div>
+          )}
         </div>
 
         <p className="text-center text-[11px] text-white/50 mt-5">

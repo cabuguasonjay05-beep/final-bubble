@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Eye, EyeOff, WashingMachine, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,24 @@ export default function LoginPage({ onLogin, onForgotPassword, onCreateAccount, 
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showHint, setShowHint] = useState(false);
+  // "register" | "reset" | null
+  const [prefillBannerType, setPrefillBannerType] = useState<"register" | "reset" | null>(null);
+
+  // Auto-fill from sessionStorage if redirected from registration or password reset
+  useEffect(() => {
+    const prefillEmail = sessionStorage.getItem("prefill_email");
+    const prefillPassword = sessionStorage.getItem("prefill_password");
+    const resetSuccess = sessionStorage.getItem("reset_success");
+    if (prefillEmail && prefillPassword) {
+      setEmail(prefillEmail);
+      setPassword(prefillPassword);
+      setRememberMe(true);
+      setPrefillBannerType(resetSuccess === "true" ? "reset" : "register");
+      sessionStorage.removeItem("prefill_email");
+      sessionStorage.removeItem("prefill_password");
+      sessionStorage.removeItem("reset_success");
+    }
+  }, []);
 
   const handleLogin = () => {
     if (!email.trim() || !password.trim()) {
@@ -79,6 +97,39 @@ export default function LoginPage({ onLogin, onForgotPassword, onCreateAccount, 
             )}
             <h1 className="text-base font-semibold text-foreground text-center">Admin Login</h1>
           </div>
+
+          {/* Prefill banner — password reset (green) */}
+          {prefillBannerType === "reset" && (
+            <div className="mb-4 flex items-start justify-between gap-2 rounded-lg bg-green-50 border border-green-200 px-3 py-2.5 text-xs text-green-800">
+              <p className="leading-relaxed font-medium">
+                Password reset successful!{" "}
+                <span className="font-normal">Your new credentials have been filled in automatically. Just click Login to continue.</span>
+              </p>
+              <button
+                type="button"
+                onClick={() => setPrefillBannerType(null)}
+                className="shrink-0 text-green-400 hover:text-green-600 transition-colors cursor-pointer font-medium"
+                aria-label="Dismiss"
+              >
+                &times;
+              </button>
+            </div>
+          )}
+
+          {/* Prefill banner — registration (blue) */}
+          {prefillBannerType === "register" && (
+            <div className="mb-4 flex items-start justify-between gap-2 rounded-lg bg-blue-50 border border-blue-200 px-3 py-2.5 text-xs text-blue-800">
+              <p className="leading-relaxed">Credentials filled from your recent registration. Just click Login to continue.</p>
+              <button
+                type="button"
+                onClick={() => setPrefillBannerType(null)}
+                className="shrink-0 text-blue-400 hover:text-blue-600 transition-colors cursor-pointer font-medium"
+                aria-label="Dismiss"
+              >
+                &times;
+              </button>
+            </div>
+          )}
 
           {/* Error banner */}
           {error && (

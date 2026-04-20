@@ -3,6 +3,11 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  allowedDevOrigins: [
+    "172.22.160.1",
+    "localhost",
+    "127.0.0.1",
+  ],
   images: {
     unoptimized: true,
   },

@@ -1,14 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 import AppShell from "@/components/app-shell";
 import LoginPage from "@/components/pages/login";
 import StaffLoginPage from "@/components/pages/staff-login";
-import ForgotPasswordPage from "@/components/pages/forgot-password";
-import RegisterPage from "@/components/pages/register";
-import type { UserProfile } from "@/lib/auth";
+import {
+  getCurrentAdminProfile,
+  isSupabaseAdminAuthConfigured,
+  signInAdmin,
+  signOutAdmin,
+} from "@/lib/admin-auth";
+import { authenticateStaff, type UserProfile } from "@/lib/auth";
+import { setBrowserSessionCache } from "@/lib/supabase/browser-session";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
-// ── Legacy type alias kept for ChangePasswordPage compat ──────────────────────
+// Legacy type alias kept for ChangePasswordPage compat
 export interface AdminProfile {
   name: string;
   email: string;
@@ -16,33 +22,129 @@ export interface AdminProfile {
   phone: string;
 }
 
-type AuthView = "role-select" | "admin-login" | "staff-login" | "forgot-password" | "register" | "app";
+type AuthView = "role-select" | "admin-login" | "staff-login" | "app";
+const AUTH_VIEW_STORAGE_KEY = "laundrytrack-auth-view";
+
+async function readJson<T>(response: Response): Promise<T> {
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message =
+      typeof data === "object" && data && "error" in data && typeof data.error === "string"
+        ? data.error
+        : "Request failed.";
+    throw new Error(message);
+  }
+  return data as T;
+}
 
 export default function Home() {
   const [view, setView] = useState<AuthView>("role-select");
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
 
-  // ── Admin login handler ────────────────────────────────────────────────────
-  const handleAdminLogin = (profile: UserProfile) => {
+  const setStoredView = useEffectEvent((nextView: AuthView) => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    if (nextView === "app") {
+      window.sessionStorage.removeItem(AUTH_VIEW_STORAGE_KEY);
+      return;
+    }
+
+    window.sessionStorage.setItem(AUTH_VIEW_STORAGE_KEY, nextView);
+  });
+
+  const syncAdminSession = useEffectEvent(async () => {
+    const storedView =
+      typeof window === "undefined"
+        ? null
+        : window.sessionStorage.getItem(AUTH_VIEW_STORAGE_KEY);
+    const initialView: AuthView =
+      storedView === "admin-login" || storedView === "staff-login" || storedView === "role-select"
+        ? storedView
+        : "role-select";
+
+    if (!isSupabaseAdminAuthConfigured()) {
+      setView(initialView);
+      setAuthLoading(false);
+      return;
+    }
+
+    const profile = await getCurrentAdminProfile().catch(() => null);
+    setUserProfile(profile);
+    setView(profile ? "app" : initialView);
+    setAuthLoading(false);
+  });
+
+  useEffect(() => {
+    void syncAdminSession();
+  }, [syncAdminSession]);
+
+  const handleAdminLogin = async (credentials: { email: string; password: string }) => {
+    const profile = await signInAdmin(credentials.email, credentials.password);
     setUserProfile(profile);
     setView("app");
+    setStoredView("app");
   };
 
-  // ── Staff login handler ────────────────────────────────────────────────────
-  const handleStaffLogin = (profile: UserProfile) => {
+  const handleStaffLogin = async (credentials: { login: string; password: string }) => {
+    const supabase = getSupabaseBrowserClient();
+
+    if (!supabase) {
+      const profile = authenticateStaff(credentials.login, credentials.password);
+      if (!profile) {
+        throw new Error("Invalid username or password.");
+      }
+
+      setUserProfile(profile);
+      setView("app");
+      setStoredView("app");
+      return;
+    }
+
+    const response = await fetch("/api/staff/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(credentials),
+    });
+
+    const data = await readJson<{ accessToken: string; refreshToken: string }>(response);
+    const { data: sessionData, error } = await supabase.auth.setSession({
+      access_token: data.accessToken,
+      refresh_token: data.refreshToken,
+    });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    setBrowserSessionCache(sessionData.session ?? null);
+
+    const profile = await getCurrentAdminProfile();
+    if (!profile) {
+      throw new Error("Unable to load your staff profile.");
+    }
+
     setUserProfile(profile);
     setView("app");
+    setStoredView("app");
   };
 
   const handleSignOut = () => {
+    if (isSupabaseAdminAuthConfigured()) {
+      void signOutAdmin();
+    }
     setUserProfile(null);
     setView("role-select");
+    setStoredView("role-select");
   };
 
-  // ── Role selection screen ─────────────────────────────────────────────────
-  if (view === "role-select") {
+  if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0c249c] px-4">
+      <div className="relative isolate min-h-screen flex items-center justify-center bg-[#0c249c] px-4">
         <div
           className="absolute inset-0 opacity-[0.06] pointer-events-none"
           style={{
@@ -50,12 +152,32 @@ export default function Home() {
             backgroundSize: "32px 32px",
           }}
         />
-        <div className="relative w-full max-w-sm">
+        <div className="relative z-10 w-full max-w-sm">
           <div className="bg-card rounded-2xl shadow-lg border border-border px-8 py-10 text-center">
-            {/* Logo */}
+            <p className="text-sm font-semibold text-foreground">Loading LaundryTrack...</p>
+            <p className="text-xs text-muted-foreground mt-2">
+              Checking your Supabase admin session.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (view === "role-select") {
+    return (
+      <div className="relative isolate min-h-screen flex items-center justify-center bg-[#0c249c] px-4">
+        <div
+          className="absolute inset-0 opacity-[0.06] pointer-events-none"
+          style={{
+            backgroundImage: "radial-gradient(circle, #ffffff 1px, transparent 1px)",
+            backgroundSize: "32px 32px",
+          }}
+        />
+        <div className="relative z-10 w-full max-w-sm">
+          <div className="bg-card rounded-2xl shadow-lg border border-border px-8 py-10 text-center">
             <div className="flex flex-col items-center mb-8">
               <div className="w-14 h-14 rounded-2xl bg-primary flex items-center justify-center shadow-md mb-3">
-                {/* Inline SVG washing machine to avoid extra import */}
                 <svg viewBox="0 0 24 24" className="w-7 h-7 text-primary-foreground fill-none stroke-current stroke-[1.5]">
                   <rect x="2" y="3" width="20" height="18" rx="2" />
                   <circle cx="12" cy="13" r="4" />
@@ -71,14 +193,22 @@ export default function Home() {
 
             <div className="flex flex-col gap-3">
               <button
-                onClick={() => setView("admin-login")}
+                type="button"
+                onClick={() => {
+                  setView("admin-login");
+                  setStoredView("admin-login");
+                }}
                 className="w-full rounded-xl border-2 border-primary bg-primary/5 hover:bg-primary/10 transition-colors px-5 py-3 text-center group cursor-pointer"
               >
                 <p className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">Admin</p>
               </button>
 
               <button
-                onClick={() => setView("staff-login")}
+                type="button"
+                onClick={() => {
+                  setView("staff-login");
+                  setStoredView("staff-login");
+                }}
                 className="w-full rounded-xl border-2 border-border hover:border-primary/40 bg-muted/30 hover:bg-primary/5 transition-colors px-5 py-3 text-center group cursor-pointer"
               >
                 <p className="text-sm font-semibold text-foreground">Staff</p>
@@ -94,22 +224,15 @@ export default function Home() {
     );
   }
 
-  // ── Auth sub-views ────────────────────────────────────────────────────────
-  if (view === "forgot-password") {
-    return <ForgotPasswordPage onBack={() => setView("admin-login")} />;
-  }
-
-  if (view === "register") {
-    return <RegisterPage onBack={() => setView("admin-login")} />;
-  }
-
   if (view === "admin-login") {
     return (
       <LoginPage
         onLogin={handleAdminLogin}
-        onForgotPassword={() => setView("forgot-password")}
-        onCreateAccount={() => setView("register")}
-        onBack={() => setView("role-select")}
+        onBack={() => {
+          setView("role-select");
+          setStoredView("role-select");
+        }}
+        authConfigured={isSupabaseAdminAuthConfigured()}
       />
     );
   }
@@ -118,20 +241,25 @@ export default function Home() {
     return (
       <StaffLoginPage
         onLogin={handleStaffLogin}
-        onSwitchToAdmin={() => setView("admin-login")}
+        authConfigured={isSupabaseAdminAuthConfigured()}
+        onSwitchToAdmin={() => {
+          setView("admin-login");
+          setStoredView("admin-login");
+        }}
       />
     );
   }
 
-  // ── App ───────────────────────────────────────────────────────────────────
-  if (!userProfile) return null;
+  if (!userProfile) {
+    return null;
+  }
 
   return (
     <AppShell
       onSignOut={handleSignOut}
       adminProfile={userProfile}
       onProfileUpdate={(updates) =>
-        setUserProfile((prev) => prev ? { ...prev, ...updates } : prev)
+        setUserProfile((prev) => (prev ? { ...prev, ...updates } : prev))
       }
     />
   );

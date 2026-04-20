@@ -25,7 +25,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { transactions as initialTxns, loyaltyMembers, statusColors, statusOrder, type Transaction, type PaymentStatus, type LoyaltyMember } from "@/lib/data";
+import { loyaltyMembers, statusColors, statusOrder, type Transaction, type PaymentStatus, type LoyaltyMember } from "@/lib/data";
+import { formatReadableDateTime } from "@/lib/date-format";
 import {
   type ServiceType,
   type AddOn,
@@ -36,6 +37,7 @@ import {
   loadAddOns,
   loadPricingConfig,
 } from "@/lib/settings-store";
+import type { CreateTransactionInput, UpdateTransactionInput } from "@/lib/transaction-contracts";
 import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
 import { PrintReceiptModal } from "@/components/print-receipt-modal";
@@ -1015,16 +1017,23 @@ function Toast({ message, onDone }: { message: string; onDone: () => void }) {
 }
 
 // ── History types ─────────────────────────────────────────────────────────────
-type HistoryEntry = {
-  prev: Transaction[];
-  next: Transaction[];
-  description: string;
-};
+interface TransactionsPageProps {
+  transactions: Transaction[];
+  loading?: boolean;
+  error?: string | null;
+  loyaltyEnabled?: boolean;
+  onCreateTransaction: (input: CreateTransactionInput) => Promise<Transaction>;
+  onUpdateTransaction: (ticketId: string, updates: UpdateTransactionInput) => Promise<Transaction>;
+}
 
-export default function TransactionsPage({ transactions: _unused, loyaltyEnabled = true }: { transactions?: unknown; loyaltyEnabled?: boolean }) {
-  const [txns, setTxns] = useState<Transaction[]>(initialTxns);
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
-  const [historyIdx, setHistoryIdx] = useState(-1);
+export default function TransactionsPage({
+  transactions: txns,
+  loading = false,
+  error = null,
+  loyaltyEnabled = true,
+  onCreateTransaction,
+  onUpdateTransaction,
+}: TransactionsPageProps) {
 
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -1046,6 +1055,7 @@ export default function TransactionsPage({ transactions: _unused, loyaltyEnabled
   const [reprintTxn, setReprintTxn]   = useState<Transaction | null>(null);
   const [printTxn, setPrintTxn]       = useState<Transaction | null>(null);
   const [printPostCreate, setPrintPostCreate] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   // Toast
   const [toast, setToast] = useState<string | null>(null);
@@ -1054,74 +1064,95 @@ export default function TransactionsPage({ transactions: _unused, loyaltyEnabled
     setToast(msg);
     setTimeout(() => setToast(null), 3200);
   };
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://laundrytrack.ph";
+  const getTrackingQrSrc = (transaction: Transaction, size: number) => {
+    const path = transaction.publicTrackingToken
+      ? `/track/${transaction.publicTrackingToken}`
+      : `/ticket/${transaction.ticketId}`;
+    return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(`${origin}${path}`)}`;
+  };
 
   // ── History helpers ──────────────────────────────────────────────���───────
-  const commit = (nextTxns: Transaction[], description: string) => {
-    const entry: HistoryEntry = { prev: txns, next: nextTxns, description };
-    const newHistory = [...history.slice(0, historyIdx + 1), entry].slice(-10);
-    setHistory(newHistory);
-    setHistoryIdx(newHistory.length - 1);
-    setTxns(nextTxns);
-  };
-
-  const undo = () => {
-    if (historyIdx < 0) return;
-    setTxns(history[historyIdx].prev);
-    setHistoryIdx(historyIdx - 1);
-    showToast("Last action undone");
-  };
-
-  const redo = () => {
-    if (historyIdx >= history.length - 1) return;
-    const next = historyIdx + 1;
-    setTxns(history[next].next);
-    setHistoryIdx(next);
-    showToast("Action re-applied");
-  };
+  const commit = (..._args: unknown[]) => undefined;
+  const undo = () => undefined;
+  const redo = () => undefined;
 
   // ── Actions ──────────────────────────────────────────────────────────────
-  const confirmVoid = () => {
+  const confirmVoid = async () => {
     if (!voidTxn || !voidReason.trim()) return;
-    const updated = txns.map((t) =>
-      t.id === voidTxn.id ? { ...t, status: "Voided" as const } : t
-    );
-    commit(updated, `Void ${voidTxn.ticketId}`);
-    showToast(`Ticket #${voidTxn.ticketId} has been voided`);
-    setVoidTxn(null);
-    setVoidReason("");
+    setBusy(true);
+    try {
+      await onUpdateTransaction(voidTxn.ticketId, {
+        status: "Voided",
+        voidReason,
+      });
+      showToast(`Ticket #${voidTxn.ticketId} has been voided`);
+      setVoidTxn(null);
+      setVoidReason("");
+    } catch {
+      showToast("Unable to void this ticket right now");
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const moveToNextStatus = () => {
+  const moveToNextStatus = async () => {
     if (!editTxn) return;
     const idx = statusOrder.indexOf(editTxn.status as (typeof statusOrder)[number]);
     if (idx < 0 || idx >= statusOrder.length - 1) return;
     const nextStatus = statusOrder[idx + 1];
-    const updated = txns.map((t) =>
-      t.id === editTxn.id ? { ...t, status: nextStatus, washInstructions: editInstructions || t.washInstructions } : t
-    );
-    commit(updated, `Status update ${editTxn.ticketId} → ${nextStatus}`);
-    setEditTxn({ ...editTxn, status: nextStatus });
-    showToast(`Ticket #${editTxn.ticketId} moved to ${nextStatus}`);
+    setBusy(true);
+    try {
+      const updatedTxn = await onUpdateTransaction(editTxn.ticketId, {
+        status: nextStatus,
+        washInstructions: editInstructions || editTxn.washInstructions,
+      });
+      setEditTxn(updatedTxn);
+      showToast(`Ticket #${editTxn.ticketId} moved to ${nextStatus}`);
+      return;
+    } catch {
+      showToast("Unable to update the ticket status right now");
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const saveInstructions = () => {
+  const saveInstructions = async () => {
     if (!editTxn) return;
-    const updated = txns.map((t) =>
-      t.id === editTxn.id ? { ...t, status: editStatus, paymentStatus: editPaymentStatus, washInstructions: editInstructions } : t
-    );
-    commit(updated, `Edit ${editTxn.ticketId}`);
-    showToast(`Ticket #${editTxn.ticketId} updated successfully`);
-    setEditTxn(null);
+    setBusy(true);
+    try {
+      await onUpdateTransaction(editTxn.ticketId, {
+        status: editStatus,
+        paymentStatus: editPaymentStatus,
+        washInstructions: editInstructions,
+      });
+      showToast(`Ticket #${editTxn.ticketId} updated successfully`);
+      setEditTxn(null);
+      return;
+    } catch {
+      showToast("Unable to save ticket changes right now");
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const markAsClaimed = () => {
+  const markAsClaimed = async () => {
     if (!editTxn) return;
-    const updated = txns.map((t) =>
-      t.id === editTxn.id ? { ...t, status: "Claimed" as const, washInstructions: editInstructions } : t
-    );
-    commit(updated, `Claimed ${editTxn.ticketId}`);
-    showToast(`Ticket #${editTxn.ticketId} marked as Claimed`);
-    setEditTxn(null);
+    setBusy(true);
+    try {
+      await onUpdateTransaction(editTxn.ticketId, {
+        status: "Claimed",
+        paymentStatus: editPaymentStatus,
+        washInstructions: editInstructions,
+      });
+      showToast(`Ticket #${editTxn.ticketId} marked as Claimed`);
+      setEditTxn(null);
+      return;
+    } catch {
+      showToast("Unable to mark this ticket as claimed right now");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const openEdit = (txn: Transaction) => {
@@ -1131,15 +1162,31 @@ export default function TransactionsPage({ transactions: _unused, loyaltyEnabled
     setEditPaymentStatus(txn.paymentStatus);
   };
 
-  const handleNewTransaction = (partial: Omit<Transaction, "id" | "ticketId">) => {
-    const newId     = String(txns.length + 1);
-    const newTicket = `TKT-${String(txns.length + 1).padStart(4, "0")}`;
-    const newTxn: Transaction = { id: newId, ticketId: newTicket, ...partial };
-    commit([newTxn, ...txns], `New transaction ${newTicket}`);
-    showToast(`Ticket #${newTicket} created for ${partial.customerName}`);
-    // Prompt to print receipt
-    setPrintTxn(newTxn);
-    setPrintPostCreate(true);
+  const handleNewTransaction = async (partial: Omit<Transaction, "id" | "ticketId">) => {
+    setBusy(true);
+    try {
+      const newTxn = await onCreateTransaction({
+        customerName: partial.customerName,
+        phone: partial.phone,
+        arrivalDateTime: partial.arrivalDateTime,
+        washType: partial.washType,
+        weight: partial.weight,
+        fee: partial.fee,
+        status: partial.status,
+        paymentStatus: partial.paymentStatus,
+        addOns: partial.addOns,
+        washInstructions: partial.washInstructions,
+        eta: partial.eta ?? null,
+      });
+      showToast(`Ticket #${newTxn.ticketId} created for ${partial.customerName}`);
+      setPrintTxn(newTxn);
+      setPrintPostCreate(true);
+      return;
+    } catch {
+      showToast("Unable to create a new transaction right now");
+    } finally {
+      setBusy(false);
+    }
   };
 
   // ── Smart priority scoring ───────────────────────────────────────────────
@@ -1217,18 +1264,23 @@ export default function TransactionsPage({ transactions: _unused, loyaltyEnabled
   })();
 
 
-  const canUndo = historyIdx >= 0;
-  const canRedo = historyIdx < history.length - 1;
+  const canUndo = false;
+  const canRedo = false;
 
   return (
     <div className="space-y-4">
       {/* Toast */}
       {toast && <Toast message={toast} onDone={() => setToast(null)} />}
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
 
       {/* Filter bar */}
       <div className="bg-card border border-border rounded-lg p-3 md:p-4 flex flex-col sm:flex-row flex-wrap gap-3">
         {/* New Transaction button */}
-        <Button size="sm" className="h-10 md:h-9 gap-1.5 shrink-0" onClick={() => setShowWizard(true)}>
+        <Button size="sm" className="h-10 md:h-9 gap-1.5 shrink-0" onClick={() => setShowWizard(true)} disabled={busy || loading}>
           <Plus className="w-4 h-4" /> New Transaction
         </Button>
 
@@ -1410,7 +1462,7 @@ export default function TransactionsPage({ transactions: _unused, loyaltyEnabled
               {filtered.length === 0 && (
                 <tr>
                   <td colSpan={9} className="text-center py-10 text-sm text-muted-foreground">
-                    No transactions found.
+                    {loading ? "Loading transactions..." : "No transactions found."}
                   </td>
                 </tr>
               )}
@@ -1438,7 +1490,7 @@ export default function TransactionsPage({ transactions: _unused, loyaltyEnabled
                   { label: "Wash Type",            value: viewTxn.washType,                                          span: false },
                   { label: "Add-ons",              value: viewTxn.addOns.length ? viewTxn.addOns.join(", ") : "None", span: false },
                   { label: "Total Fee",            value: `₱${viewTxn.fee}`,                                         span: false },
-                  { label: "ETA",                  value: "Same day",                                                span: false },
+                  { label: "ETA",                  value: viewTxn.eta ? formatReadableDateTime(viewTxn.eta) : "Awaiting estimate", span: false },
                 ].map((row) => (
                   <div key={row.label} className={cn("bg-muted/30 rounded-md p-2.5", row.span && "col-span-2")}>
                     <p className="text-[11px] text-muted-foreground">{row.label}</p>
@@ -1505,7 +1557,7 @@ export default function TransactionsPage({ transactions: _unused, loyaltyEnabled
               {/* QR Code */}
               <div className="flex flex-col items-center gap-2 py-2 bg-muted/30 rounded-lg">
                 <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`https://laundrytrack.ph/ticket/${viewTxn.ticketId}`)}`}
+                  src={getTrackingQrSrc(viewTxn, 100)}
                   alt={`QR for ${viewTxn.ticketId}`}
                   width={100}
                   height={100}
@@ -1726,7 +1778,7 @@ export default function TransactionsPage({ transactions: _unused, loyaltyEnabled
           {reprintTxn && (
             <div className="flex flex-col items-center gap-3 py-4">
               <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`https://laundrytrack.ph/ticket/${reprintTxn.ticketId}`)}`}
+                src={getTrackingQrSrc(reprintTxn, 180)}
                 alt={`QR code for ${reprintTxn.ticketId}`}
                 width={180}
                 height={180}

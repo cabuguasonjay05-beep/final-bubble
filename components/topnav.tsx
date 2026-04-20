@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import { type Page } from "@/components/sidebar";
 import type { UserProfile } from "@/lib/auth";
+import type { Transaction } from "@/lib/data";
 
 const pageTitles: Record<Page, string> = {
   dashboard: "Dashboard",
@@ -55,11 +56,12 @@ interface TopNavProps {
   onNavigate: (page: Page) => void;
   onSignOut: () => void;
   adminProfile: UserProfile;
+  transactions?: Transaction[];
   onMenuToggle: () => void;
   onTransactionDetail?: (ticketId: string) => void;
 }
 
-export default function TopNav({ activePage, onNavigate, onSignOut, adminProfile, onMenuToggle, onTransactionDetail }: TopNavProps) {
+export default function TopNav({ activePage, onNavigate, onSignOut, adminProfile, transactions: liveTransactions = transactions, onMenuToggle, onTransactionDetail }: TopNavProps) {
   const isStaff = adminProfile.role === "staff";
   const [notifications, setNotifications] = useState<Notification[]>(initialNotifications);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -142,7 +144,7 @@ export default function TopNav({ activePage, onNavigate, onSignOut, adminProfile
                       <p className="text-[11px] text-muted-foreground leading-snug">{notif.customerName}</p>
                       <div className="flex items-center gap-1.5 mt-0.5">
                         {(() => {
-                          const txn = transactions.find((t) => t.ticketId === notif.ticketId);
+                          const txn = liveTransactions.find((t) => t.ticketId === notif.ticketId);
                           if (!txn) return null;
                           return txn.paymentStatus === "paid" ? (
                             <span className="inline-block px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-green-500 text-white">PAID</span>

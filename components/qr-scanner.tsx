@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CameraOff } from "lucide-react";
+import jsQR from "jsqr";
 
 interface QRScannerProps {
   onScan: (value: string) => void;
@@ -15,6 +16,17 @@ export default function QRScanner({ onScan }: QRScannerProps) {
   const canvasRef  = useRef<HTMLCanvasElement | null>(null);
   const [active, setActive] = useState(false);
   const [error, setError]   = useState<string | null>(null);
+
+  const normalizeScannedValue = useCallback((raw: string) => {
+    const ticketMatch = raw.match(/ticket\/([A-Z0-9-]+)/i);
+    const trackMatch = raw.match(/track\/([a-z0-9]+)/i);
+
+    return ticketMatch
+      ? ticketMatch[1].toUpperCase()
+      : trackMatch
+        ? trackMatch[1].toLowerCase()
+        : raw;
+  }, []);
 
   const stopScanner = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -40,43 +52,64 @@ export default function QRScanner({ onScan }: QRScannerProps) {
       }
       setActive(true);
 
-      // Use BarcodeDetector if available (Chrome 83+, Edge, Safari 17+)
-      const BD = (window as unknown as { BarcodeDetector?: new (opts: { formats: string[] }) => { detect: (src: HTMLVideoElement) => Promise<{ rawValue: string }[]> } }).BarcodeDetector;
-      if (!BD) {
-        setError("QR scanning is not supported in this browser. Try Chrome or Edge. You can still use Manual Lookup below.");
-        stopScanner();
-        return;
-      }
-      const detector = new BD({ formats: ["qr_code"] });
+      const BD = (window as unknown as {
+        BarcodeDetector?: new (opts: { formats: string[] }) => {
+          detect: (src: HTMLVideoElement) => Promise<Array<{ rawValue: string }>>;
+        };
+      }).BarcodeDetector;
+      const detector = BD ? new BD({ formats: ["qr_code"] }) : null;
 
       const tick = async () => {
         if (!videoRef.current || videoRef.current.readyState < 2) {
           rafRef.current = requestAnimationFrame(tick);
           return;
         }
+
         try {
-          const results = await detector.detect(videoRef.current);
-          if (results.length > 0) {
-            const raw = results[0].rawValue;
-            const match = raw.match(/ticket\/([A-Z0-9-]+)/i);
-            const ticketId = match ? match[1].toUpperCase() : raw;
-            onScan(ticketId);
-            stopScanner();
-            return;
+          if (detector) {
+            const results = await detector.detect(videoRef.current);
+            if (results.length > 0) {
+              onScan(normalizeScannedValue(results[0].rawValue));
+              stopScanner();
+              return;
+            }
+          } else if (canvasRef.current && videoRef.current.videoWidth > 0 && videoRef.current.videoHeight > 0) {
+            const canvas = canvasRef.current;
+            const context = canvas.getContext("2d", { willReadFrequently: true });
+
+            if (context) {
+              canvas.width = videoRef.current.videoWidth;
+              canvas.height = videoRef.current.videoHeight;
+              context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+              const image = context.getImageData(0, 0, canvas.width, canvas.height);
+              const result = jsQR(image.data, image.width, image.height, {
+                inversionAttempts: "dontInvert",
+              });
+
+              if (result?.data) {
+                onScan(normalizeScannedValue(result.data));
+                stopScanner();
+                return;
+              }
+            }
           }
         } catch { /* continue scanning */ }
+
         rafRef.current = requestAnimationFrame(tick);
       };
+
       rafRef.current = requestAnimationFrame(tick);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setError(
         msg.toLowerCase().includes("permission") || msg.toLowerCase().includes("denied")
           ? "Camera permission denied. Please allow camera access and try again."
+          : msg.toLowerCase().includes("secure context")
+            ? "Camera needs a secure page. Use localhost or HTTPS and try again."
           : "Could not start camera. Check your device and browser permissions."
       );
     }
-  }, [onScan, stopScanner]);
+  }, [normalizeScannedValue, onScan, stopScanner]);
 
   useEffect(() => () => { stopScanner(); }, [stopScanner]);
 

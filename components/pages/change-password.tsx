@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { updateAdminIdentity, updateAdminPassword } from "@/lib/admin-auth";
 import { cn } from "@/lib/utils";
 import type { UserProfile as AdminProfile } from "@/lib/auth";
 
@@ -80,27 +81,38 @@ export default function ChangePasswordPage({ adminProfile, onProfileUpdate }: Ch
   const [newUsername, setNewUsername]           = useState("");
   const [credCurrentPassword, setCredCurrentPassword] = useState("");
   const [credSuccess, setCredSuccess]           = useState(false);
+  const [credError, setCredError]               = useState<string | null>(null);
+  const [savingCred, setSavingCred]             = useState(false);
 
   // Keep the "Current Email" field in sync whenever the parent profile updates
   useEffect(() => {
     setCredCurrentEmail(adminProfile.email);
   }, [adminProfile.email]);
 
-  const canSaveCred = credCurrentPassword.trim().length > 0;
+  const canSaveCred = credCurrentPassword.trim().length > 0 && (newEmail.trim().length > 0 || newUsername.trim().length > 0);
 
-  const handleCredSave = () => {
+  const handleCredSave = async () => {
     if (!canSaveCred) return;
-    const updates: Partial<AdminProfile> = {};
-    if (newEmail.trim()) updates.email = newEmail.trim();
-    if (newUsername.trim()) updates.username = newUsername.trim();
-    if (Object.keys(updates).length > 0) {
-      onProfileUpdate(updates);
+    setSavingCred(true);
+    setCredError(null);
+    try {
+      const updatedProfile = await updateAdminIdentity({
+        currentPassword: credCurrentPassword,
+        newEmail,
+        newUsername,
+      });
+      onProfileUpdate(updatedProfile);
+      setNewEmail("");
+      setNewUsername("");
+      setCredCurrentPassword("");
+      setCredSuccess(true);
+      setTimeout(() => setCredSuccess(false), 4000);
+    } catch (saveError) {
+      setCredError(saveError instanceof Error ? saveError.message : "Unable to update your login credentials.");
+      setCredSuccess(false);
+    } finally {
+      setSavingCred(false);
     }
-    setNewEmail("");
-    setNewUsername("");
-    setCredCurrentPassword("");
-    setCredSuccess(true);
-    setTimeout(() => setCredSuccess(false), 4000);
   };
 
   // --- Change Password state ---
@@ -108,17 +120,34 @@ export default function ChangePasswordPage({ adminProfile, onProfileUpdate }: Ch
   const [newPw, setNewPw]     = useState("");
   const [confirm, setConfirm] = useState("");
   const [pwSuccess, setPwSuccess] = useState(false);
+  const [pwError, setPwError] = useState<string | null>(null);
+  const [savingPw, setSavingPw] = useState(false);
 
   const strength    = getStrength(newPw);
   const allPassed   = requirements.every((r) => r.test(newPw));
   const pwMatch     = newPw.length > 0 && newPw === confirm;
   const canSavePw   = current.length > 0 && allPassed && pwMatch;
 
-  const handleSavePw = () => {
+  const handleSavePw = async () => {
     if (!canSavePw) return;
-    setPwSuccess(true);
-    setCurrent(""); setNewPw(""); setConfirm("");
-    setTimeout(() => setPwSuccess(false), 4000);
+    setSavingPw(true);
+    setPwError(null);
+    try {
+      await updateAdminPassword({
+        currentPassword: current,
+        newPassword: newPw,
+      });
+      setPwSuccess(true);
+      setCurrent("");
+      setNewPw("");
+      setConfirm("");
+      setTimeout(() => setPwSuccess(false), 4000);
+    } catch (saveError) {
+      setPwError(saveError instanceof Error ? saveError.message : "Unable to update your password.");
+      setPwSuccess(false);
+    } finally {
+      setSavingPw(false);
+    }
   };
 
   return (
@@ -141,7 +170,7 @@ export default function ChangePasswordPage({ adminProfile, onProfileUpdate }: Ch
               id="cred-current-email"
               type="email"
               value={credCurrentEmail}
-              onChange={(e) => { setCredCurrentEmail(e.target.value); setCredSuccess(false); }}
+              onChange={(e) => { setCredCurrentEmail(e.target.value); setCredSuccess(false); setCredError(null); }}
               placeholder="Current email address"
               className="h-9 text-sm"
             />
@@ -155,7 +184,7 @@ export default function ChangePasswordPage({ adminProfile, onProfileUpdate }: Ch
               id="cred-new-email"
               type="email"
               value={newEmail}
-              onChange={(e) => { setNewEmail(e.target.value); setCredSuccess(false); }}
+              onChange={(e) => { setNewEmail(e.target.value); setCredSuccess(false); setCredError(null); }}
               placeholder="Enter new email address"
               className="h-9 text-sm"
             />
@@ -169,7 +198,7 @@ export default function ChangePasswordPage({ adminProfile, onProfileUpdate }: Ch
               id="cred-new-username"
               type="text"
               value={newUsername}
-              onChange={(e) => { setNewUsername(e.target.value); setCredSuccess(false); }}
+              onChange={(e) => { setNewUsername(e.target.value); setCredSuccess(false); setCredError(null); }}
               placeholder="Enter new username"
               className="h-9 text-sm"
             />
@@ -179,16 +208,16 @@ export default function ChangePasswordPage({ adminProfile, onProfileUpdate }: Ch
             id="cred-current-password"
             label="Current Password"
             value={credCurrentPassword}
-            onChange={(v) => { setCredCurrentPassword(v); setCredSuccess(false); }}
+            onChange={(v) => { setCredCurrentPassword(v); setCredSuccess(false); setCredError(null); }}
             placeholder="Enter current password to confirm"
           />
 
           <Button
             className="w-full cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90"
-            disabled={!canSaveCred}
-            onClick={handleCredSave}
+            disabled={!canSaveCred || savingCred}
+            onClick={() => void handleCredSave()}
           >
-            Save Changes
+            {savingCred ? "Saving..." : "Save Changes"}
           </Button>
 
           {credSuccess && (
@@ -197,6 +226,8 @@ export default function ChangePasswordPage({ adminProfile, onProfileUpdate }: Ch
               Login credentials updated successfully!
             </p>
           )}
+
+          {credError && <p className="text-xs text-destructive">{credError}</p>}
         </CardContent>
       </Card>
 
@@ -221,7 +252,7 @@ export default function ChangePasswordPage({ adminProfile, onProfileUpdate }: Ch
             id="new-pw"
             label="New Password"
             value={newPw}
-            onChange={(v) => { setNewPw(v); setPwSuccess(false); }}
+            onChange={(v) => { setNewPw(v); setPwSuccess(false); setPwError(null); }}
             placeholder="Enter new password"
           />
 
@@ -278,7 +309,7 @@ export default function ChangePasswordPage({ adminProfile, onProfileUpdate }: Ch
             id="confirm-pw"
             label="Confirm New Password"
             value={confirm}
-            onChange={(v) => { setConfirm(v); setPwSuccess(false); }}
+            onChange={(v) => { setConfirm(v); setPwSuccess(false); setPwError(null); }}
             placeholder="Re-enter new password"
           />
 
@@ -288,11 +319,11 @@ export default function ChangePasswordPage({ adminProfile, onProfileUpdate }: Ch
 
           <Button
             className="w-full cursor-pointer"
-            disabled={!canSavePw}
-            onClick={handleSavePw}
+            disabled={!canSavePw || savingPw}
+            onClick={() => void handleSavePw()}
           >
             <Save className="w-3.5 h-3.5 mr-1.5" />
-            Save New Password
+            {savingPw ? "Saving..." : "Save New Password"}
           </Button>
 
           {pwSuccess && (
@@ -301,6 +332,8 @@ export default function ChangePasswordPage({ adminProfile, onProfileUpdate }: Ch
               Password changed successfully!
             </p>
           )}
+
+          {pwError && <p className="text-xs text-destructive">{pwError}</p>}
         </CardContent>
       </Card>
 

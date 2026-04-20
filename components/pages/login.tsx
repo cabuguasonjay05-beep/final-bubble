@@ -1,69 +1,57 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Eye, EyeOff, WashingMachine, ChevronDown, ChevronUp } from "lucide-react";
+import { useState } from "react";
+import { Eye, EyeOff, Loader2, WashingMachine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { authenticateAdmin } from "@/lib/auth";
-import type { UserProfile } from "@/lib/auth";
-
-// TODO: Replace mock auth with Supabase auth
 
 interface LoginPageProps {
-  onLogin: (profile: UserProfile) => void;
-  onForgotPassword: () => void;
-  onCreateAccount: () => void;
+  onLogin: (credentials: { email: string; password: string }) => Promise<void> | void;
   onBack?: () => void;
+  authConfigured?: boolean;
 }
 
-export default function LoginPage({ onLogin, onForgotPassword, onCreateAccount, onBack }: LoginPageProps) {
+export default function LoginPage({
+  onLogin,
+  onBack,
+  authConfigured = true,
+}: LoginPageProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showHint, setShowHint] = useState(false);
-  // "register" | "reset" | null
-  const [prefillBannerType, setPrefillBannerType] = useState<"register" | "reset" | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  // Auto-fill from sessionStorage if redirected from registration or password reset
-  useEffect(() => {
-    const prefillEmail = sessionStorage.getItem("prefill_email");
-    const prefillPassword = sessionStorage.getItem("prefill_password");
-    const resetSuccess = sessionStorage.getItem("reset_success");
-    if (prefillEmail && prefillPassword) {
-      setEmail(prefillEmail);
-      setPassword(prefillPassword);
-      setRememberMe(true);
-      setPrefillBannerType(resetSuccess === "true" ? "reset" : "register");
-      sessionStorage.removeItem("prefill_email");
-      sessionStorage.removeItem("prefill_password");
-      sessionStorage.removeItem("reset_success");
-    }
-  }, []);
-
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
       setError("Please fill in all fields.");
       return;
     }
-    const profile = authenticateAdmin(email, password);
-    if (!profile) {
-      setError("Invalid email or password.");
-      return;
+
+    setSubmitting(true);
+    try {
+      await onLogin({
+        email,
+        password,
+      });
+      setError(null);
+    } catch (loginError) {
+      setError(loginError instanceof Error ? loginError.message : "Invalid email or password.");
+    } finally {
+      setSubmitting(false);
     }
-    setError(null);
-    onLogin(profile);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") handleLogin();
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === "Enter") {
+      void handleLogin();
+    }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0c249c] px-4">
-      {/* Subtle pattern overlay */}
+    <div className="relative isolate min-h-screen flex items-center justify-center bg-[#0c249c] px-4">
       <div
         className="absolute inset-0 opacity-[0.06] pointer-events-none"
         style={{
@@ -72,10 +60,8 @@ export default function LoginPage({ onLogin, onForgotPassword, onCreateAccount, 
         }}
       />
 
-      <div className="relative w-full max-w-sm">
-        {/* Card */}
+      <div className="relative z-10 w-full max-w-sm">
         <div className="bg-card rounded-2xl shadow-lg border border-border px-8 py-10">
-          {/* Logo */}
           <div className="flex flex-col items-center mb-8">
             <div className="w-14 h-14 rounded-2xl bg-primary flex items-center justify-center shadow-md mb-3">
               <WashingMachine className="w-7 h-7 text-primary-foreground" />
@@ -98,40 +84,12 @@ export default function LoginPage({ onLogin, onForgotPassword, onCreateAccount, 
             <h1 className="text-base font-semibold text-foreground text-center">Admin Login</h1>
           </div>
 
-          {/* Prefill banner — password reset (green) */}
-          {prefillBannerType === "reset" && (
-            <div className="mb-4 flex items-start justify-between gap-2 rounded-lg bg-green-50 border border-green-200 px-3 py-2.5 text-xs text-green-800">
-              <p className="leading-relaxed font-medium">
-                Password reset successful!{" "}
-                <span className="font-normal">Your new credentials have been filled in automatically. Just click Login to continue.</span>
-              </p>
-              <button
-                type="button"
-                onClick={() => setPrefillBannerType(null)}
-                className="shrink-0 text-green-400 hover:text-green-600 transition-colors cursor-pointer font-medium"
-                aria-label="Dismiss"
-              >
-                &times;
-              </button>
+          {!authConfigured && (
+            <div className="mb-4 rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
+              Supabase admin auth is not configured yet. Add your project keys to `.env.local`.
             </div>
           )}
 
-          {/* Prefill banner — registration (blue) */}
-          {prefillBannerType === "register" && (
-            <div className="mb-4 flex items-start justify-between gap-2 rounded-lg bg-blue-50 border border-blue-200 px-3 py-2.5 text-xs text-blue-800">
-              <p className="leading-relaxed">Credentials filled from your recent registration. Just click Login to continue.</p>
-              <button
-                type="button"
-                onClick={() => setPrefillBannerType(null)}
-                className="shrink-0 text-blue-400 hover:text-blue-600 transition-colors cursor-pointer font-medium"
-                aria-label="Dismiss"
-              >
-                &times;
-              </button>
-            </div>
-          )}
-
-          {/* Error banner */}
           {error && (
             <div className="mb-4 rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-2 text-xs text-destructive font-medium text-center">
               {error}
@@ -139,7 +97,6 @@ export default function LoginPage({ onLogin, onForgotPassword, onCreateAccount, 
           )}
 
           <div className="flex flex-col gap-4">
-            {/* Email */}
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="email" className="text-xs font-medium text-foreground">
                 Email
@@ -147,16 +104,18 @@ export default function LoginPage({ onLogin, onForgotPassword, onCreateAccount, 
               <Input
                 id="email"
                 type="email"
-                placeholder="admin@laundrytrack.ph"
+                placeholder="admin@example.com"
                 value={email}
-                onChange={(e) => { setEmail(e.target.value); setError(null); }}
+                onChange={(event) => {
+                  setEmail(event.target.value);
+                  setError(null);
+                }}
                 onKeyDown={handleKeyDown}
                 className={error && !email.trim() ? "border-destructive focus-visible:ring-destructive" : ""}
                 autoComplete="email"
               />
             </div>
 
-            {/* Password */}
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="password" className="text-xs font-medium text-foreground">
                 Password
@@ -167,14 +126,17 @@ export default function LoginPage({ onLogin, onForgotPassword, onCreateAccount, 
                   type={showPassword ? "text" : "password"}
                   placeholder="Enter your password"
                   value={password}
-                  onChange={(e) => { setPassword(e.target.value); setError(null); }}
+                  onChange={(event) => {
+                    setPassword(event.target.value);
+                    setError(null);
+                  }}
                   onKeyDown={handleKeyDown}
                   className={`pr-10 ${error && !password.trim() ? "border-destructive focus-visible:ring-destructive" : ""}`}
                   autoComplete="current-password"
                 />
                 <button
                   type="button"
-                  onClick={() => setShowPassword((v) => !v)}
+                  onClick={() => setShowPassword((value) => !value)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
@@ -183,68 +145,34 @@ export default function LoginPage({ onLogin, onForgotPassword, onCreateAccount, 
               </div>
             </div>
 
-            {/* Remember Me */}
             <label className="flex items-center gap-2 cursor-pointer select-none">
               <input
                 type="checkbox"
                 checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
+                onChange={(event) => setRememberMe(event.target.checked)}
                 className="w-4 h-4 rounded border-input accent-primary cursor-pointer"
               />
               <span className="text-xs text-muted-foreground">Remember me</span>
             </label>
 
-            {/* Login button */}
-            <Button className="w-full mt-1 cursor-pointer" onClick={handleLogin}>
-              Login
-            </Button>
-
-            {/* Demo credentials hint */}
-            <div className="rounded-lg bg-blue-50 border border-blue-200 overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setShowHint((v) => !v)}
-                className="w-full flex items-center justify-between px-3 py-2 text-[11px] font-medium text-blue-700 hover:bg-blue-100 transition-colors cursor-pointer"
-              >
-                <span>&#128273; Demo Credentials (for testing only)</span>
-                {showHint
-                  ? <ChevronUp className="w-3.5 h-3.5 shrink-0" />
-                  : <ChevronDown className="w-3.5 h-3.5 shrink-0" />
-                }
-              </button>
-              {showHint && (
-                <div className="px-3 pb-3 pt-1 text-[11px] text-blue-800 space-y-1 border-t border-blue-200 bg-blue-50">
-                  <p><span className="font-semibold">Email:</span> admin@laundrytrack.ph</p>
-                  <p><span className="font-semibold">Password:</span> admin123</p>
-                </div>
-              )}
-            </div>
-
-            {/* Forgot password */}
-            <button
-              type="button"
-              onClick={onForgotPassword}
-              className="text-xs text-primary hover:underline text-center cursor-pointer transition-colors"
-            >
-              Forgot Password?
-            </button>
-
-            {/* Divider */}
-            <div className="flex items-center gap-3 my-1">
-              <div className="flex-1 h-px bg-border" />
-              <span className="text-xs text-muted-foreground">or</span>
-              <div className="flex-1 h-px bg-border" />
-            </div>
-
-            {/* Create Account */}
             <Button
-              type="button"
-              variant="outline"
-              className="w-full border-primary text-primary hover:bg-primary/5 cursor-pointer"
-              onClick={onCreateAccount}
+              className="w-full mt-1 cursor-pointer"
+              onClick={() => void handleLogin()}
+              disabled={submitting || !authConfigured}
             >
-              Create Account
+              {submitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Signing In...
+                </>
+              ) : (
+                "Login"
+              )}
             </Button>
+
+            <div className="rounded-lg border border-border bg-muted/30 px-3 py-2.5 text-[11px] text-muted-foreground">
+              Admin access is managed in Supabase. Use the admin email and password created for your project.
+            </div>
           </div>
         </div>
 

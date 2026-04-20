@@ -4,7 +4,7 @@ import { useState } from "react";
 import Sidebar, { type Page } from "@/components/sidebar";
 import TopNav from "@/components/topnav";
 import { TransactionDetailModal } from "@/components/transaction-detail-modal";
-import { transactions, type Transaction } from "@/lib/data";
+import { type Transaction } from "@/lib/data";
 import { loadLoyaltySettings, loadBusinessProfile, type BusinessProfile } from "@/lib/settings-store";
 import DashboardPage from "@/components/pages/dashboard";
 import TransactionsPage from "@/components/pages/transactions";
@@ -18,6 +18,7 @@ import DataImportPage from "@/components/pages/data-import";
 import StaffManagementPage from "@/components/pages/staff-management";
 import AuditLogsPage from "@/components/pages/audit-logs";
 import type { UserProfile } from "@/lib/auth";
+import { useTransactions } from "@/hooks/use-transactions";
 import { toast } from "@/hooks/use-toast";
 
 interface AppShellProps {
@@ -31,9 +32,16 @@ export default function AppShell({ onSignOut, adminProfile, onProfileUpdate }: A
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [detailTxn, setDetailTxn] = useState<Transaction | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
-  const [txns, setTxns] = useState<Transaction[]>(transactions);
   const [loyaltyEnabled, setLoyaltyEnabled] = useState<boolean>(() => loadLoyaltySettings().enabled);
   const [businessProfile, setBusinessProfile] = useState<BusinessProfile>(() => loadBusinessProfile());
+  const {
+    transactions: txns,
+    loading: transactionsLoading,
+    error: transactionsError,
+    createTransaction,
+    updateTransaction,
+    resolveScannedValue,
+  } = useTransactions();
 
   const handleTransactionDetail = (ticketId: string) => {
     const txn = txns.find((t) => t.ticketId === ticketId) ?? null;
@@ -41,16 +49,31 @@ export default function AppShell({ onSignOut, adminProfile, onProfileUpdate }: A
     setDetailOpen(true);
   };
 
-  const handleUpdateTransaction = (ticketId: string, updates: Partial<Transaction>) => {
-    setTxns((prev) => prev.map((t) => t.ticketId === ticketId ? { ...t, ...updates } : t));
-  };
-
   const renderPage = () => {
     switch (activePage) {
       case "dashboard": return <DashboardPage transactions={txns} loyaltyEnabled={loyaltyEnabled} role={adminProfile.role} onNavigate={handleNavigate} />;
-      case "transactions": return <TransactionsPage transactions={txns} loyaltyEnabled={loyaltyEnabled} />;
-      case "claim-verification": return <ClaimVerificationPage transactions={txns} onUpdateTransaction={handleUpdateTransaction} />;
-      case "reports": return <ReportsPage />;
+      case "transactions":
+        return (
+          <TransactionsPage
+            transactions={txns}
+            loading={transactionsLoading}
+            error={transactionsError}
+            loyaltyEnabled={loyaltyEnabled}
+            onCreateTransaction={createTransaction}
+            onUpdateTransaction={updateTransaction}
+          />
+        );
+      case "claim-verification":
+        return (
+          <ClaimVerificationPage
+            transactions={txns}
+            loading={transactionsLoading}
+            error={transactionsError}
+            onUpdateTransaction={updateTransaction}
+            onResolveScannedValue={resolveScannedValue}
+          />
+        );
+      case "reports": return <ReportsPage transactions={txns} />;
       case "settings-pricing":
       case "settings-service-types":
       case "settings-backup":
@@ -123,6 +146,7 @@ export default function AppShell({ onSignOut, adminProfile, onProfileUpdate }: A
           onNavigate={handleNavigate}
           onSignOut={onSignOut}
           adminProfile={adminProfile}
+          transactions={txns}
           onMenuToggle={() => setMobileMenuOpen((v) => !v)}
           onTransactionDetail={handleTransactionDetail}
         />

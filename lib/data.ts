@@ -15,6 +15,9 @@ export interface Transaction {
   paymentStatus: PaymentStatus;
   addOns: string[];
   washInstructions?: string;
+  publicTrackingToken?: string;
+  updatedAt?: string;
+  eta?: string | null;
 }
 
 export interface LoyaltyMember {

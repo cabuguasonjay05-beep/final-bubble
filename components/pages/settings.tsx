@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Plus, Trash2, Edit, Save, Upload, Clock, Download, Loader2, CheckCircle2, Scale, ShoppingBasket, Package, X, Eye, EyeOff, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,6 +41,8 @@ import {
   loadLoyaltySettings,
   persistLoyaltySettings,
 } from "@/lib/settings-store";
+import { getBrowserAccessToken } from "@/lib/supabase/browser-session";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 // ─── Pricing ────────────────────────────────────────────────────────────────
 
@@ -732,6 +734,27 @@ function BusinessProfileSettings({ onSave }: { onSave?: (profile: BusinessProfil
 
   const update = (patch: Partial<BusinessProfile>) => setProfile((p) => ({ ...p, ...patch }));
 
+  useEffect(() => {
+    let ignore = false;
+
+    void fetch("/api/settings/business-profile", {
+      cache: "no-store",
+    })
+      .then(async (response) => {
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.profile) return;
+        if (!ignore) {
+          setProfile(data.profile as BusinessProfile);
+          persistBusinessProfile(data.profile as BusinessProfile);
+        }
+      })
+      .catch(() => undefined);
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -741,9 +764,27 @@ function BusinessProfileSettings({ onSave }: { onSave?: (profile: BusinessProfil
     reader.readAsDataURL(file);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     persistBusinessProfile(profile);
-    onSave?.(profile);
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (getSupabaseBrowserClient()) {
+      const accessToken = await getBrowserAccessToken();
+      if (accessToken) {
+        headers.Authorization = `Bearer ${accessToken}`;
+      }
+    }
+    const response = await fetch("/api/settings/business-profile", {
+      method: "PUT",
+      headers,
+      body: JSON.stringify(profile),
+    });
+    const data = await response.json().catch(() => ({ profile }));
+    const savedProfile = (response.ok && data.profile ? data.profile : profile) as BusinessProfile;
+    persistBusinessProfile(savedProfile);
+    onSave?.(savedProfile);
+    setProfile(savedProfile);
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
   };
@@ -876,6 +917,17 @@ function BusinessProfileSettings({ onSave }: { onSave?: (profile: BusinessProfil
               value={profile.receiptFooter}
               onChange={(e) => update({ receiptFooter: e.target.value })}
               placeholder="e.g. Thank you for choosing Sunshine Laundry Shop!"
+              className="text-sm resize-none"
+              rows={2}
+            />
+          </div>
+
+          <div>
+            <Label className="text-xs font-medium mb-1.5 block">Pickup Instructions</Label>
+            <Textarea
+              value={profile.pickupInstructions}
+              onChange={(e) => update({ pickupInstructions: e.target.value })}
+              placeholder="e.g. Present this receipt or QR code upon claiming."
               className="text-sm resize-none"
               rows={2}
             />

@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from "@/components/ui/button";
 import { Printer, X } from "lucide-react";
 import { type Transaction } from "@/lib/data";
+import { formatReadableDateTime } from "@/lib/date-format";
 import { loadBusinessProfile, type BusinessProfile } from "@/lib/settings-store";
 
 interface PrintReceiptModalProps {
@@ -30,6 +31,11 @@ export function PrintReceiptModal({ open, onOpenChange, transaction, postCreate 
 
   const addOnsTotal = 0; // Add-ons pricing not tracked per-item; fee already includes them
   const baseFee = transaction.fee;
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://laundrytrack.ph";
+  const trackingPath = transaction.publicTrackingToken
+    ? `/track/${transaction.publicTrackingToken}`
+    : `/ticket/${transaction.ticketId}`;
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(`${origin}${trackingPath}`)}`;
 
   const handlePrint = () => {
     const content = receiptRef.current?.innerHTML;
@@ -67,8 +73,6 @@ export function PrintReceiptModal({ open, onOpenChange, transaction, postCreate 
     `);
     win.document.close();
   };
-
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(`https://laundrytrack.ph/ticket/${transaction.ticketId}`)}`;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -179,7 +183,7 @@ export function PrintReceiptModal({ open, onOpenChange, transaction, postCreate 
             </div>
             <div className="row" style={{ display: "flex", justifyContent: "space-between", margin: "2px 0" }}>
               <span className="label" style={{ color: "#555" }}>ETA</span>
-              <span>Same day</span>
+              <span>{transaction.eta ? formatReadableDateTime(transaction.eta) : "Awaiting estimate"}</span>
             </div>
             <div className="divider" style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
 

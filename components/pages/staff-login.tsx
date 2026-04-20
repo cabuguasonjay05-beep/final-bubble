@@ -1,45 +1,57 @@
 "use client";
 
 import { useState } from "react";
-import { Eye, EyeOff, WashingMachine, ChevronDown, ChevronUp } from "lucide-react";
+import { Eye, EyeOff, WashingMachine, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { authenticateStaff } from "@/lib/auth";
-import type { UserProfile } from "@/lib/auth";
 
 interface StaffLoginPageProps {
-  onLogin: (profile: UserProfile) => void;
+  onLogin: (credentials: { login: string; password: string }) => Promise<void> | void;
   onSwitchToAdmin: () => void;
+  authConfigured?: boolean;
 }
 
-export default function StaffLoginPage({ onLogin, onSwitchToAdmin }: StaffLoginPageProps) {
-  const [username, setUsername] = useState("");
+export default function StaffLoginPage({
+  onLogin,
+  onSwitchToAdmin,
+  authConfigured = true,
+}: StaffLoginPageProps) {
+  const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showHint, setShowHint] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleLogin = () => {
-    if (!username.trim() || !password.trim()) {
+  const handleLogin = async () => {
+    if (!login.trim() || !password.trim()) {
       setError("Please fill in all fields.");
       return;
     }
-    const profile = authenticateStaff(username, password);
-    if (!profile) {
-      setError("Invalid username or password.");
-      return;
+
+    setSubmitting(true);
+    try {
+      await onLogin({
+        login,
+        password,
+      });
+      setError(null);
+    } catch (loginError) {
+      setError(loginError instanceof Error ? loginError.message : "Invalid username or password.");
+    } finally {
+      setSubmitting(false);
     }
-    setError(null);
-    onLogin(profile);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") handleLogin();
+    if (e.key === "Enter") {
+      void handleLogin();
+    }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0c249c] px-4">
+    <div className="relative isolate min-h-screen flex items-center justify-center bg-[#0c249c] px-4">
       {/* Subtle dot pattern */}
       <div
         className="absolute inset-0 opacity-[0.06] pointer-events-none"
@@ -49,7 +61,7 @@ export default function StaffLoginPage({ onLogin, onSwitchToAdmin }: StaffLoginP
         }}
       />
 
-      <div className="relative w-full max-w-sm">
+      <div className="relative z-10 w-full max-w-sm">
         <div className="bg-card rounded-2xl shadow-lg border border-border px-8 py-10">
           {/* Logo */}
           <div className="flex flex-col items-center mb-8">
@@ -69,20 +81,26 @@ export default function StaffLoginPage({ onLogin, onSwitchToAdmin }: StaffLoginP
             </div>
           )}
 
+          {!authConfigured && (
+            <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+              Supabase staff auth is not configured yet, so this page uses the built-in demo accounts.
+            </div>
+          )}
+
           <div className="flex flex-col gap-4">
             {/* Username */}
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="staff-username" className="text-xs font-medium text-foreground">
-                Username
+                Username or Email
               </Label>
               <Input
                 id="staff-username"
                 type="text"
                 placeholder="staff01"
-                value={username}
-                onChange={(e) => { setUsername(e.target.value); setError(null); }}
+                value={login}
+                onChange={(e) => { setLogin(e.target.value); setError(null); }}
                 onKeyDown={handleKeyDown}
-                className={error && !username.trim() ? "border-destructive focus-visible:ring-destructive" : ""}
+                className={error && !login.trim() ? "border-destructive focus-visible:ring-destructive" : ""}
                 autoComplete="username"
               />
             </div>
@@ -120,8 +138,15 @@ export default function StaffLoginPage({ onLogin, onSwitchToAdmin }: StaffLoginP
             </p>
 
             {/* Login button */}
-            <Button className="w-full cursor-pointer" onClick={handleLogin}>
-              Login
+            <Button className="w-full cursor-pointer" onClick={() => void handleLogin()} disabled={submitting}>
+              {submitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Signing In...
+                </>
+              ) : (
+                "Login"
+              )}
             </Button>
 
             {/* Demo credentials hint */}

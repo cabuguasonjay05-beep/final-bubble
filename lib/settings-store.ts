@@ -1,5 +1,7 @@
 "use client";
 
+import { DEFAULT_BUSINESS_PROFILE, type BusinessProfile } from "@/lib/business-profile";
+
 // ─── Shared types ────────────────────────────────────────────────────────────
 
 export type PricingType = "per-kg" | "per-load" | "per-piece";
@@ -41,26 +43,8 @@ export interface PricingConfig {
 
 // ─── Business Profile ────────────────────────────────────────────────────────
 
-export interface BusinessProfile {
-  shopName: string;
-  tagline: string;
-  address: string;
-  contactNumber: string;
-  email: string;
-  /** base64 data-URL of the uploaded logo, or empty string */
-  logoDataUrl: string;
-  receiptFooter: string;
-}
-
-export const DEFAULT_BUSINESS_PROFILE: BusinessProfile = {
-  shopName:      "Sunshine Laundry Shop",
-  tagline:       "Powered by LaundryTrack",
-  address:       "123 Magsaysay Ave, Brgy. Sta. Cruz, Manila",
-  contactNumber: "(02) 8123-4567",
-  email:         "contact@laundrytrack.ph",
-  logoDataUrl:   "",
-  receiptFooter: "Thank you for choosing Sunshine Laundry Shop!",
-};
+export type { BusinessProfile } from "@/lib/business-profile";
+export { DEFAULT_BUSINESS_PROFILE } from "@/lib/business-profile";
 
 // ─── Loyalty Settings ─────────────────────────────────────────────────────────
 
@@ -157,7 +141,10 @@ export function persistPricingConfig(cfg: PricingConfig): void {
 }
 
 export function loadBusinessProfile(): BusinessProfile {
-  return load(LS_BUSINESS_PROFILE, DEFAULT_BUSINESS_PROFILE);
+  return {
+    ...DEFAULT_BUSINESS_PROFILE,
+    ...load(LS_BUSINESS_PROFILE, DEFAULT_BUSINESS_PROFILE),
+  };
 }
 
 export function persistBusinessProfile(profile: BusinessProfile): void {

@@ -69,6 +69,71 @@ function PricingSettings() {
     () => loadPricingConfig().priceDisplayMode ?? "show"
   );
 
+  // ── Service Types (merged) ──────────────────────────────────────────────
+  const [services, setServices] = useState<ServiceType[]>(loadServiceTypes);
+
+  const updateServices = (next: ServiceType[]) => {
+    setServices(next);
+    persistServiceTypes(next);
+  };
+
+  // Add-new service form
+  const [svcNewName, setSvcNewName]               = useState("");
+  const [svcNewDesc, setSvcNewDesc]               = useState("");
+  const [svcNewPrice, setSvcNewPrice]             = useState("");
+  const [svcNewPricingType, setSvcNewPricingType] = useState<PricingType>("per-kg");
+  const [svcNewShowInTxn, setSvcNewShowInTxn]     = useState(true);
+  const [svcNewShowPrice, setSvcNewShowPrice]     = useState(true);
+
+  // Edit modal
+  const [editTarget, setEditTarget]             = useState<ServiceType | null>(null);
+  const [editName, setEditName]                 = useState("");
+  const [editDesc, setEditDesc]                 = useState("");
+  const [editPrice, setEditPrice]               = useState("");
+  const [editPricingType, setEditPricingType]   = useState<PricingType>("per-kg");
+  const [editActive, setEditActive]             = useState(true);
+  const [editShowPrice, setEditShowPrice]       = useState(true);
+
+  const openEdit = (s: ServiceType) => {
+    setEditTarget(s);
+    setEditName(s.name);
+    setEditDesc(s.description);
+    setEditPrice(s.price);
+    setEditPricingType(s.pricingType);
+    setEditActive(s.active);
+    setEditShowPrice(s.showPrice ?? true);
+  };
+
+  const saveEdit = () => {
+    if (!editTarget) return;
+    updateServices(services.map((s) =>
+      s.id === editTarget.id
+        ? { ...s, name: editName, description: editDesc, price: editPrice, pricingType: editPricingType, active: editActive, showPrice: editShowPrice }
+        : s
+    ));
+    setEditTarget(null);
+  };
+
+  const handleAddService = () => {
+    if (!svcNewName.trim() || !svcNewPrice.trim()) return;
+    updateServices([
+      ...services,
+      {
+        id: Date.now().toString(),
+        name: svcNewName.trim(),
+        description: svcNewDesc.trim(),
+        price: svcNewPrice.trim(),
+        pricingType: svcNewPricingType,
+        active: svcNewShowInTxn,
+        showPrice: svcNewShowPrice,
+      },
+    ]);
+    setSvcNewName(""); setSvcNewDesc(""); setSvcNewPrice(""); setSvcNewPricingType("per-kg");
+    setSvcNewShowInTxn(true); setSvcNewShowPrice(true);
+  };
+
+  const canAddService = svcNewName.trim().length > 0 && svcNewPrice.trim().length > 0;
+
   // Save state
   const [saved, setSaved] = useState(false);
 
@@ -238,6 +303,195 @@ function PricingSettings() {
         </CardContent>
       </Card>
 
+      {/* ── Service Types ────────────────────────────────────────────────── */}
+      <Card className="border border-border shadow-none">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm">Service Types</CardTitle>
+          <CardDescription className="text-xs">Manage available wash service categories.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {services.map((s) => (
+            <div
+              key={s.id}
+              className={cn(
+                "rounded-md px-3 py-2.5 space-y-2 transition-opacity duration-150",
+                s.active ? "bg-muted/30" : "bg-muted/10 opacity-60"
+              )}
+            >
+              {/* Top row: name + badges */}
+              <div className="flex items-start gap-2 flex-wrap">
+                <p className="text-sm font-semibold text-foreground">{s.name}</p>
+                {s.active && (s.showPrice ?? true) && (
+                  <span className="text-xs font-semibold text-primary bg-primary/10 rounded-full px-2 py-0.5">&#x20B1;{s.price}</span>
+                )}
+                <span className="text-[10px] font-medium text-muted-foreground bg-muted rounded-full px-2 py-0.5 border border-border">
+                  {PRICING_TYPE_LABELS[s.pricingType] ?? s.pricingType}
+                </span>
+              </div>
+              {s.description && <p className="text-xs text-muted-foreground">{s.description}</p>}
+
+              {/* Bottom row: toggles + actions */}
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-1.5">
+                  <Switch
+                    checked={s.active}
+                    onCheckedChange={(v) =>
+                      updateServices(services.map((x) =>
+                        x.id === s.id
+                          ? { ...x, active: v, showPrice: v ? (x.showPrice ?? true) : false }
+                          : x
+                      ))
+                    }
+                    className="scale-90"
+                  />
+                  <span className="text-[11px] text-muted-foreground font-medium">Show</span>
+                </div>
+                <div
+                  className={cn(
+                    "flex items-center gap-1.5 transition-opacity duration-150",
+                    !s.active && "opacity-40 pointer-events-none cursor-not-allowed"
+                  )}
+                  title={!s.active ? "Enable Show first to configure Price" : undefined}
+                >
+                  <Switch
+                    checked={(s.showPrice ?? true) && s.active}
+                    onCheckedChange={(v) => updateServices(services.map((x) => x.id === s.id ? { ...x, showPrice: v } : x))}
+                    disabled={!s.active}
+                    className="scale-90"
+                  />
+                  <span className="text-[11px] text-muted-foreground font-medium">Price</span>
+                </div>
+                <div className="flex-1" />
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(s)}>
+                  <Edit className="w-3.5 h-3.5" />
+                </Button>
+                <Button
+                  variant="ghost" size="icon"
+                  className="h-7 w-7 text-destructive hover:text-destructive"
+                  onClick={() => updateServices(services.filter((x) => x.id !== s.id))}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            </div>
+          ))}
+
+          {/* Add new service form */}
+          <div className="mt-3 pt-3 border-t border-border space-y-2">
+            <p className="text-xs font-semibold text-muted-foreground">Add New Service Type</p>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="col-span-2">
+                <Label className="text-[10px] text-muted-foreground mb-1 block">Service Name <span className="text-destructive">*</span></Label>
+                <Input placeholder="e.g. Heavy Duty Wash" value={svcNewName} onChange={(e) => setSvcNewName(e.target.value)} className="h-8 text-sm" />
+              </div>
+              <div className="col-span-2">
+                <Label className="text-[10px] text-muted-foreground mb-1 block">Description</Label>
+                <Input placeholder="e.g. For heavily soiled items" value={svcNewDesc} onChange={(e) => setSvcNewDesc(e.target.value)} className="h-8 text-sm" />
+              </div>
+              <div>
+                <Label className="text-[10px] text-muted-foreground mb-1 block">Price (&#x20B1;) <span className="text-destructive">*</span></Label>
+                <Input type="number" min="0" placeholder="e.g. 60" value={svcNewPrice} onChange={(e) => setSvcNewPrice(e.target.value)} className="h-8 text-sm" />
+              </div>
+              <div>
+                <Label className="text-[10px] text-muted-foreground mb-1 block">Pricing Type</Label>
+                <Select value={svcNewPricingType} onValueChange={(v) => setSvcNewPricingType(v as PricingType)}>
+                  <SelectTrigger className="h-8 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="per-kg">Per kg</SelectItem>
+                    <SelectItem value="per-load">Per load</SelectItem>
+                    <SelectItem value="per-piece">Per piece</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 pt-1">
+              <div className="flex items-center gap-2">
+                <Switch checked={svcNewShowInTxn} onCheckedChange={setSvcNewShowInTxn} />
+                <Label className="text-xs text-muted-foreground">Show in Transaction</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch checked={svcNewShowPrice} onCheckedChange={setSvcNewShowPrice} />
+                <Label className="text-xs text-muted-foreground">Show Price</Label>
+              </div>
+            </div>
+            <Button size="sm" className="h-8 gap-1.5 mt-1" onClick={handleAddService} disabled={!canAddService}>
+              <Plus className="w-3.5 h-3.5" /> Add Service Type
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Edit service modal */}
+      <Dialog open={!!editTarget} onOpenChange={(o) => { if (!o) setEditTarget(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-base">Edit Service Type</DialogTitle>
+            <DialogDescription className="sr-only">
+              Edit the name, description, price, and settings for this service type.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 pt-1">
+            <div>
+              <Label className="text-xs font-medium mb-1.5 block">Service Name <span className="text-destructive">*</span></Label>
+              <Input value={editName} onChange={(e) => setEditName(e.target.value)} className="h-9 text-sm" />
+            </div>
+            <div>
+              <Label className="text-xs font-medium mb-1.5 block">Description</Label>
+              <Textarea
+                value={editDesc}
+                onChange={(e) => setEditDesc(e.target.value)}
+                className="text-sm resize-none"
+                rows={2}
+                placeholder="Optional description"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs font-medium mb-1.5 block">Price (&#x20B1;) <span className="text-destructive">*</span></Label>
+                <Input type="number" min="0" value={editPrice} onChange={(e) => setEditPrice(e.target.value)} className="h-9 text-sm" />
+              </div>
+              <div>
+                <Label className="text-xs font-medium mb-1.5 block">Pricing Type</Label>
+                <Select value={editPricingType} onValueChange={(v) => setEditPricingType(v as PricingType)}>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="per-kg">Per kg</SelectItem>
+                    <SelectItem value="per-load">Per load</SelectItem>
+                    <SelectItem value="per-piece">Per piece</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="flex items-center justify-between bg-muted/30 rounded-md px-3 py-2.5">
+                <Label className="text-sm">Show</Label>
+                <Switch checked={editActive} onCheckedChange={setEditActive} />
+              </div>
+              <div className="flex items-center justify-between bg-muted/30 rounded-md px-3 py-2.5">
+                <Label className="text-sm">Price</Label>
+                <Switch checked={editShowPrice} onCheckedChange={setEditShowPrice} />
+              </div>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button
+                className="flex-1 gap-1.5"
+                onClick={saveEdit}
+                disabled={!editName.trim() || !editPrice.trim()}
+              >
+                <Save className="w-3.5 h-3.5" /> Save Changes
+              </Button>
+              <Button variant="outline" className="flex-1" onClick={() => setEditTarget(null)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* ── Add-on Rates ─────────────────────────────────────────────────── */}
       <Card className="border border-border shadow-none">
         <CardHeader className="pb-3">
@@ -351,7 +605,7 @@ function PricingSettings() {
       {saved ? (
         <div className="flex items-center gap-2 text-green-700 bg-green-50 border border-green-200 rounded-lg px-4 py-2 text-sm animate-in fade-in slide-in-from-bottom-1">
           <CheckCircle2 className="w-4 h-4 shrink-0" />
-          Pricing settings saved!
+          Settings saved!
         </div>
       ) : (
         <p className="text-xs text-muted-foreground">Changes are not saved until you click Save.</p>
@@ -361,6 +615,7 @@ function PricingSettings() {
         onClick={() => {
           persistPricingConfig({ pricePerKg, minWeight, pricingMode, loadTiers, priceDisplayMode });
           persistAddOns(addOns);
+          persistServiceTypes(services);
           setSaved(true);
           setTimeout(() => setSaved(false), 3000);
         }}
@@ -380,321 +635,6 @@ const PRICING_TYPE_LABELS: Record<PricingType, string> = {
   "per-load":  "Per load",
   "per-piece": "Per piece",
 };
-
-function ServiceTypesSettings() {
-  const [services, setServices] = useState<ServiceType[]>(loadServiceTypes);
-
-  // Helper: update state + persist in one call
-  const updateServices = (next: ServiceType[]) => {
-    setServices(next);
-    persistServiceTypes(next);
-  };
-
-  // Add-new form
-  const [newName, setNewName]               = useState("");
-  const [newDesc, setNewDesc]               = useState("");
-  const [newPrice, setNewPrice]             = useState("");
-  const [newPricingType, setNewPricingType] = useState<PricingType>("per-kg");
-  const [newShowInTxn, setNewShowInTxn]     = useState(true);
-  const [newShowPrice, setNewShowPrice]     = useState(true);
-
-  // Edit modal
-  const [editTarget, setEditTarget]         = useState<ServiceType | null>(null);
-  const [editName, setEditName]             = useState("");
-  const [editDesc, setEditDesc]             = useState("");
-  const [editPrice, setEditPrice]           = useState("");
-  const [editPricingType, setEditPricingType] = useState<PricingType>("per-kg");
-  const [editActive, setEditActive]         = useState(true);
-  const [editShowPrice, setEditShowPrice]   = useState(true);
-
-  // Toasts
-  const [toast, setToast] = useState<string | null>(null);
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 3000);
-  };
-
-  const openEdit = (s: ServiceType) => {
-    setEditTarget(s);
-    setEditName(s.name);
-    setEditDesc(s.description);
-    setEditPrice(s.price);
-    setEditPricingType(s.pricingType);
-    setEditActive(s.active);
-    setEditShowPrice(s.showPrice ?? true);
-  };
-
-  const saveEdit = () => {
-    if (!editTarget) return;
-    const next = services.map((s) =>
-      s.id === editTarget.id
-        ? { ...s, name: editName, description: editDesc, price: editPrice, pricingType: editPricingType, active: editActive, showPrice: editShowPrice }
-        : s
-    );
-    updateServices(next);
-    setEditTarget(null);
-    showToast("Service type updated successfully!");
-  };
-
-  const handleAdd = () => {
-    if (!newName.trim() || !newPrice.trim()) return;
-    const next = [
-      ...services,
-      {
-        id: Date.now().toString(),
-        name: newName.trim(),
-        description: newDesc.trim(),
-        price: newPrice.trim(),
-        pricingType: newPricingType,
-        active: newShowInTxn,
-        showPrice: newShowPrice,
-      },
-    ];
-    updateServices(next);
-    setNewName(""); setNewDesc(""); setNewPrice(""); setNewPricingType("per-kg");
-    setNewShowInTxn(true); setNewShowPrice(true);
-    showToast("Service type added successfully!");
-  };
-
-  const handleSaveAll = () => {
-    persistServiceTypes(services);
-    showToast("All service types saved successfully!");
-  };
-
-  const canAdd = newName.trim().length > 0 && newPrice.trim().length > 0;
-
-  return (
-    <div className="space-y-4 w-full max-w-lg">
-      {/* Toast */}
-      {toast && (
-        <div className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-800 rounded-lg px-4 py-3 text-sm animate-in fade-in slide-in-from-top-2">
-          <CheckCircle2 className="w-4 h-4 shrink-0 text-green-600" />
-          {toast}
-        </div>
-      )}
-
-      {/* Service type list */}
-      <Card className="border border-border shadow-none">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm">Service Types</CardTitle>
-          <CardDescription className="text-xs">Manage available wash service categories.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {services.map((s) => (
-            <div
-              key={s.id}
-              className={cn(
-                "rounded-md px-3 py-2.5 space-y-2 transition-opacity duration-150",
-                s.active ? "bg-muted/30" : "bg-muted/10 opacity-60"
-              )}
-            >
-              {/* Top row: name + badges */}
-              <div className="flex items-start gap-2 flex-wrap">
-                <p className="text-sm font-semibold text-foreground">{s.name}</p>
-                {s.active && (s.showPrice ?? true) && (
-                  <span className="text-xs font-semibold text-primary bg-primary/10 rounded-full px-2 py-0.5">₱{s.price}</span>
-                )}
-                <span className="text-[10px] font-medium text-muted-foreground bg-muted rounded-full px-2 py-0.5 border border-border">
-                  {PRICING_TYPE_LABELS[s.pricingType] ?? s.pricingType}
-                </span>
-              </div>
-              {s.description && <p className="text-xs text-muted-foreground">{s.description}</p>}
-
-              {/* Bottom row: toggles + actions */}
-              <div className="flex items-center gap-3 flex-wrap">
-                {/* Toggle 1: Show in Transaction — turning OFF also forces showPrice OFF */}
-                <div className="flex items-center gap-1.5">
-                  <Switch
-                    checked={s.active}
-                    onCheckedChange={(v) =>
-                      updateServices(services.map((x) =>
-                        x.id === s.id
-                          ? { ...x, active: v, showPrice: v ? (x.showPrice ?? true) : false }
-                          : x
-                      ))
-                    }
-                    className="scale-90"
-                  />
-                  <span className="text-[11px] text-muted-foreground font-medium">Show</span>
-                </div>
-                {/* Toggle 2: Show Price — disabled, dimmed, and has tooltip when Show is OFF */}
-                <div
-                  className={cn(
-                    "flex items-center gap-1.5 transition-opacity duration-150",
-                    !s.active && "opacity-40 pointer-events-none cursor-not-allowed"
-                  )}
-                  title={!s.active ? "Enable Show first to configure Price" : undefined}
-                >
-                  <Switch
-                    checked={(s.showPrice ?? true) && s.active}
-                    onCheckedChange={(v) => updateServices(services.map((x) => x.id === s.id ? { ...x, showPrice: v } : x))}
-                    disabled={!s.active}
-                    className="scale-90"
-                  />
-                  <span className="text-[11px] text-muted-foreground font-medium">Price</span>
-                </div>
-                {/* Spacer */}
-                <div className="flex-1" />
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(s)}>
-                  <Edit className="w-3.5 h-3.5" />
-                </Button>
-                <Button
-                  variant="ghost" size="icon"
-                  className="h-7 w-7 text-destructive hover:text-destructive"
-                  onClick={() => updateServices(services.filter((x) => x.id !== s.id))}
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </Button>
-              </div>
-            </div>
-          ))}
-
-          {/* Add new form */}
-          <div className="mt-3 pt-3 border-t border-border space-y-2">
-            <p className="text-xs font-semibold text-muted-foreground">Add New Service Type</p>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="col-span-2">
-                <Label className="text-[10px] text-muted-foreground mb-1 block">Service Name <span className="text-destructive">*</span></Label>
-                <Input
-                  placeholder="e.g. Heavy Duty Wash"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  className="h-8 text-sm"
-                />
-              </div>
-              <div className="col-span-2">
-                <Label className="text-[10px] text-muted-foreground mb-1 block">Description</Label>
-                <Input
-                  placeholder="e.g. For heavily soiled items"
-                  value={newDesc}
-                  onChange={(e) => setNewDesc(e.target.value)}
-                  className="h-8 text-sm"
-                />
-              </div>
-              <div>
-                <Label className="text-[10px] text-muted-foreground mb-1 block">Price (₱) <span className="text-destructive">*</span></Label>
-                <Input
-                  type="number"
-                  min="0"
-                  placeholder="e.g. 60"
-                  value={newPrice}
-                  onChange={(e) => setNewPrice(e.target.value)}
-                  className="h-8 text-sm"
-                />
-              </div>
-              <div>
-                <Label className="text-[10px] text-muted-foreground mb-1 block">Pricing Type</Label>
-                <Select value={newPricingType} onValueChange={(v) => setNewPricingType(v as PricingType)}>
-                  <SelectTrigger className="h-8 text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="per-kg">Per kg</SelectItem>
-                    <SelectItem value="per-load">Per load</SelectItem>
-                    <SelectItem value="per-piece">Per piece</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="flex items-center gap-4 pt-1">
-              <div className="flex items-center gap-2">
-                <Switch checked={newShowInTxn} onCheckedChange={setNewShowInTxn} />
-                <Label className="text-xs text-muted-foreground">Show in Transaction</Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <Switch checked={newShowPrice} onCheckedChange={setNewShowPrice} />
-                <Label className="text-xs text-muted-foreground">Show Price</Label>
-              </div>
-            </div>
-            <Button size="sm" className="h-8 gap-1.5 mt-1" onClick={handleAdd} disabled={!canAdd}>
-              <Plus className="w-3.5 h-3.5" /> Add Service Type
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Save all */}
-      <Button className="w-full gap-1.5" onClick={handleSaveAll}>
-        <Save className="w-4 h-4" /> Save All Changes
-      </Button>
-
-      {/* Edit modal */}
-      <Dialog open={!!editTarget} onOpenChange={(o) => { if (!o) setEditTarget(null); }}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="text-base">Edit Service Type</DialogTitle>
-            <DialogDescription className="sr-only">
-              Edit the name, description, price, and settings for this service type.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 pt-1">
-            <div>
-              <Label className="text-xs font-medium mb-1.5 block">Service Name <span className="text-destructive">*</span></Label>
-              <Input value={editName} onChange={(e) => setEditName(e.target.value)} className="h-9 text-sm" />
-            </div>
-            <div>
-              <Label className="text-xs font-medium mb-1.5 block">Description</Label>
-              <Textarea
-                value={editDesc}
-                onChange={(e) => setEditDesc(e.target.value)}
-                className="text-sm resize-none"
-                rows={2}
-                placeholder="Optional description"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs font-medium mb-1.5 block">Price (₱) <span className="text-destructive">*</span></Label>
-                <Input
-                  type="number"
-                  min="0"
-                  value={editPrice}
-                  onChange={(e) => setEditPrice(e.target.value)}
-                  className="h-9 text-sm"
-                />
-              </div>
-              <div>
-                <Label className="text-xs font-medium mb-1.5 block">Pricing Type</Label>
-                <Select value={editPricingType} onValueChange={(v) => setEditPricingType(v as PricingType)}>
-                  <SelectTrigger className="h-9 text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="per-kg">Per kg</SelectItem>
-                    <SelectItem value="per-load">Per load</SelectItem>
-                    <SelectItem value="per-piece">Per piece</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="flex items-center justify-between bg-muted/30 rounded-md px-3 py-2.5">
-                <Label className="text-sm">Show</Label>
-                <Switch checked={editActive} onCheckedChange={setEditActive} />
-              </div>
-              <div className="flex items-center justify-between bg-muted/30 rounded-md px-3 py-2.5">
-                <Label className="text-sm">Price</Label>
-                <Switch checked={editShowPrice} onCheckedChange={setEditShowPrice} />
-              </div>
-            </div>
-            <div className="flex gap-2 pt-1">
-              <Button
-                className="flex-1 gap-1.5"
-                onClick={saveEdit}
-                disabled={!editName.trim() || !editPrice.trim()}
-              >
-                <Save className="w-3.5 h-3.5" /> Save Changes
-              </Button>
-              <Button variant="outline" className="flex-1" onClick={() => setEditTarget(null)}>
-                Cancel
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-}
 
 // ─── Business Profile ────────────────────────────────────────────────────────
 function BusinessProfileSettings({ onSave }: { onSave?: (profile: BusinessProfile) => void }) {
@@ -1204,7 +1144,7 @@ interface SettingsPageProps {
 export default function SettingsPage({ page, loyaltyEnabled = true, onLoyaltyEnabledChange, onBusinessProfileChange }: SettingsPageProps) {
   switch (page) {
     case "settings-pricing": return <PricingSettings />;
-    case "settings-service-types": return <ServiceTypesSettings />;
+    case "settings-service-types": return <PricingSettings />;
     case "settings-business-profile": return <BusinessProfileSettings onSave={onBusinessProfileChange} />;
     case "settings-loyalty": return (
       <LoyaltyProgramSettings

@@ -77,7 +77,7 @@ export default function AppShell({ onSignOut, adminProfile, onProfileUpdate }: A
       case "settings-pricing":
       case "settings-service-types":
       case "settings-backup":
-        return <SettingsPage page={activePage} />;
+        return <SettingsPage page={activePage === "settings-service-types" ? "settings-pricing" : activePage} />;
       case "settings-business-profile":
         return <SettingsPage page={activePage} onBusinessProfileChange={setBusinessProfile} />;
       case "settings-loyalty":

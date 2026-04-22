@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Eye, EyeOff, WashingMachine, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
+import { Eye, EyeOff, WashingMachine, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,7 +21,6 @@ export default function StaffLoginPage({
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showHint, setShowHint] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const handleLogin = async () => {
@@ -78,12 +77,6 @@ export default function StaffLoginPage({
           {error && (
             <div className="mb-4 rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-2 text-xs text-destructive font-medium text-center">
               {error}
-            </div>
-          )}
-
-          {!authConfigured && (
-            <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
-              Supabase staff auth is not configured yet, so this page uses the built-in demo accounts.
             </div>
           )}
 
@@ -148,34 +141,6 @@ export default function StaffLoginPage({
                 "Login"
               )}
             </Button>
-
-            {/* Demo credentials hint */}
-            <div className="rounded-lg bg-blue-50 border border-blue-200 overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setShowHint((v) => !v)}
-                className="w-full flex items-center justify-between px-3 py-2 text-[11px] font-medium text-blue-700 hover:bg-blue-100 transition-colors cursor-pointer"
-              >
-                <span>&#128273; Demo Credentials (for testing only)</span>
-                {showHint
-                  ? <ChevronUp className="w-3.5 h-3.5 shrink-0" />
-                  : <ChevronDown className="w-3.5 h-3.5 shrink-0" />
-                }
-              </button>
-              {showHint && (
-                <div className="px-3 pb-3 pt-1 text-[11px] text-blue-800 space-y-1 border-t border-blue-200 bg-blue-50">
-                  <p><span className="font-semibold">Username:</span> staff01</p>
-                  <p><span className="font-semibold">Password:</span> staff123</p>
-                </div>
-              )}
-            </div>
-
-            {/* Switch to admin */}
-            <div className="flex items-center gap-3 my-1">
-              <div className="flex-1 h-px bg-border" />
-              <span className="text-xs text-muted-foreground">or</span>
-              <div className="flex-1 h-px bg-border" />
-            </div>
 
             <Button
               type="button"

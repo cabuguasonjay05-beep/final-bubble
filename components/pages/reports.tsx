@@ -54,7 +54,7 @@ const exportOptions: Array<{ id: ExportSection; label: string }> = [
 const PIE_COLORS = ["#2563eb", "#0f766e", "#f59e0b", "#dc2626", "#7c3aed", "#475569"];
 
 function formatCurrency(value: number) {
-  return `PHP ${value.toLocaleString()}`;
+  return `\u20B1${value.toLocaleString()}`;
 }
 
 function getHourLabel(transaction: Transaction) {

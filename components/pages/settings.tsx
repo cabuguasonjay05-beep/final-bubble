@@ -138,36 +138,6 @@ function PricingSettings() {
             </div>
           </div>
 
-          {/* Per Kilogram fields */}
-          {showKg && (
-            <div className="space-y-3 pt-1">
-              {pricingMode === "both" && (
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Per Kilogram</p>
-              )}
-              <div className="flex items-center gap-3">
-                <Label className="text-sm w-36 shrink-0">Price per kg (₱)</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  value={pricePerKg}
-                  onChange={(e) => setPricePerKg(e.target.value)}
-                  className="w-28 h-9 text-sm"
-                />
-              </div>
-              <div className="flex items-center gap-3">
-                <Label className="text-sm w-36 shrink-0">Minimum weight (kg)</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  placeholder="e.g. 3 kg minimum"
-                  value={minWeight}
-                  onChange={(e) => setMinWeight(e.target.value)}
-                  className="w-28 h-9 text-sm"
-                />
-              </div>
-            </div>
-          )}
-
           {/* Per Load tier table */}
           {showLoad && (
             <div className="space-y-3 pt-1">

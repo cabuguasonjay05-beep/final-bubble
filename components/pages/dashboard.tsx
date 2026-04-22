@@ -3,7 +3,6 @@
 import { useState } from "react";
 import {
   ShoppingBag,
-  DollarSign,
   AlertCircle,
   Loader2,
   Users,
@@ -76,7 +75,7 @@ export default function DashboardPage({
     {
       label: "Total Revenue Today",
       value: formatCurrency(totalRevenue),
-      icon: DollarSign,
+      icon: null,
       color: "text-green-600",
       bg: "bg-green-50",
       change: "+12% vs yesterday",
@@ -125,7 +124,11 @@ export default function DashboardPage({
                       <p className="mt-1 text-xs text-muted-foreground">{card.change}</p>
                     </div>
                     <div className={`ml-3 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg md:h-10 md:w-10 ${card.bg}`}>
-                      <Icon className={`h-4 w-4 md:h-5 md:w-5 ${card.color}`} />
+                      {Icon ? (
+                        <Icon className={`h-4 w-4 md:h-5 md:w-5 ${card.color}`} />
+                      ) : (
+                        <span className={`text-base font-bold md:text-lg ${card.color}`}>&#8369;</span>
+                      )}
                     </div>
                   </div>
                 </CardContent>

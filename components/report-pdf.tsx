@@ -138,7 +138,7 @@ function ReportDocument({ exportFrom, exportTo, sections, transactions, serviceR
         t.customerName,
         t.phone,
         String(ct.length),
-        `PHP ${ct.reduce((s, x) => s + x.fee, 0)}`,
+        `\u20B1${ct.reduce((s, x) => s + x.fee, 0)}`,
       ]);
     }
   });
@@ -165,7 +165,7 @@ function ReportDocument({ exportFrom, exportTo, sections, transactions, serviceR
                 t.dropOffDate,
                 t.washType,
                 `${t.weight} kg`,
-                `PHP ${t.fee}`,
+                `\u20B1${t.fee}`,
                 t.status,
               ])}
               flexes={[0.9, 1.4, 1.1, 0.9, 0.9, 0.7, 0.7, 0.9]}
@@ -186,12 +186,12 @@ function ReportDocument({ exportFrom, exportTo, sections, transactions, serviceR
           <View style={S.body}>
             <Text style={S.sectionTitle}>Revenue by Service Type</Text>
             <Table
-              headers={["Service", "Transactions", "Revenue (PHP)", "Avg per Order (PHP)"]}
+              headers={["Service", "Transactions", "Revenue (\u20B1)", "Avg per Order (\u20B1)"]}
               rows={serviceRevenue.map((r) => [
                 r.service,
                 String(r.count),
-                `PHP ${r.revenue.toLocaleString()}`,
-                `PHP ${Math.round(r.revenue / r.count)}`,
+                `\u20B1${r.revenue.toLocaleString()}`,
+                `\u20B1${Math.round(r.revenue / r.count)}`,
               ])}
             />
           </View>
@@ -210,7 +210,7 @@ function ReportDocument({ exportFrom, exportTo, sections, transactions, serviceR
           <View style={S.body}>
             <Text style={S.sectionTitle}>Customer List</Text>
             <Table
-              headers={["Name", "Phone", "Total Transactions", "Total Spent (PHP)"]}
+              headers={["Name", "Phone", "Total Transactions", "Total Spent (\u20B1)"]}
               rows={custRows}
               flexes={[1.4, 1.1, 1, 1]}
             />

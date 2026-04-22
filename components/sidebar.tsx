@@ -11,7 +11,6 @@ import {
   ChevronDown,
   ChevronRight,
   DollarSign,
-  Tag,
   Building2,
   Database,
   Star,
@@ -67,11 +66,10 @@ const allNavItems = [
 
 const settingsSubItems = [
   { id: "settings-pricing" as Page, label: "Pricing", icon: DollarSign },
-  { id: "settings-service-types" as Page, label: "Service Types", icon: Tag },
   { id: "settings-business-profile" as Page, label: "Business Profile", icon: Building2 },
   { id: "settings-loyalty" as Page, label: "Loyalty Program", icon: Gift },
-  { id: "settings-backup" as Page, label: "Backup & Restore", icon: Database },
   { id: "settings-data-import" as Page, label: "Data Import", icon: Upload },
+  { id: "settings-backup" as Page, label: "Backup & Restore", icon: Database },
 ];
 
 export default function Sidebar({ activePage, onNavigate, loyaltyEnabled, role = "admin" }: SidebarProps) {

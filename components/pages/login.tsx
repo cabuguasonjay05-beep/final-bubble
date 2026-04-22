@@ -84,12 +84,6 @@ export default function LoginPage({
             <h1 className="text-base font-semibold text-foreground text-center">Admin Login</h1>
           </div>
 
-          {!authConfigured && (
-            <div className="mb-4 rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
-              Supabase admin auth is not configured yet. Add your project keys to `.env.local`.
-            </div>
-          )}
-
           {error && (
             <div className="mb-4 rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-2 text-xs text-destructive font-medium text-center">
               {error}
@@ -170,9 +164,6 @@ export default function LoginPage({
               )}
             </Button>
 
-            <div className="rounded-lg border border-border bg-muted/30 px-3 py-2.5 text-[11px] text-muted-foreground">
-              Admin access is managed in Supabase. Use the admin email and password created for your project.
-            </div>
           </div>
         </div>
 
